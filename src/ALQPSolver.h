@@ -92,14 +92,14 @@ class QP{
 
         // returns left hand side of the equality constraints   
         Matrix<m,1> c_eq(Matrix<nx,1> x){
-            return _A*x - _b
+            return _A*x - _b;
         };
         // returns left hand side of the inequality constraints   
         Matrix<p,1> c_in(Matrix<nx,1> x){
-            return _G*x - _h
+            return _G*x - _h;
         };
 
-        Matrix<nx,1> primal_residual(Matrix<nx> x, Matrix<m> lambda, Matrix<p> mu){
+        Matrix<nx,1> primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
             if (m != 0){
                 return x + _q + ~_A*lambda +  ~_G*mu;
             }
@@ -108,9 +108,9 @@ class QP{
             }            
         }; 
 
-        Matrix<m+p,1>  dual_residual(Matrix<nx> x, Matrix<m> lambda, Matrix<p> mu){
-            Matrix<m> c = c_eq(x);
-            Matrix<p> h = c_in(x);
+        Matrix<m+p,1>  dual_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
+            Matrix<m,1> c = c_eq(x);
+            Matrix<p,1> h = c_in(x);
             for (int i = 0; i < p; i++){
                 h(i) = max(h(i), 0);
             }
@@ -122,9 +122,9 @@ class QP{
             }            
         };
 
-        void dual_update(Matrix<nx> x, Matrix<m> &lambda, Matrix<p> &mu, int rho){
-            Matrix<p> c = c_in(x);
-            Matrix<m> h = c_eq(x);
+        void dual_update(Matrix<nx,1> x, Matrix<m,1> &lambda, Matrix<p> &mu, int rho){
+            Matrix<p,1> c = c_in(x);
+            Matrix<m,1> h = c_eq(x);
             for (int i = 0; i < p; i++){
                 mu(i) = max(0, mu(i)+rho*c(i));
             }
@@ -135,10 +135,10 @@ class QP{
             }            
         };
         
-        Matrix<p,p> coinactfilt(Matrix<nx> x, Matrix<p> mu, int rho){
+        Matrix<p,p> coinactfilt(Matrix<nx,1> x, Matrix<p,1> mu, int rho){
             Matrix<p,p> Ip;
             Ip.Fill(0);
-            Matrix<p> h = c_in(x);
+            Matrix<p,1> h = c_in(x);
             for (int i = 0; i < p; i++){
                 if (h(i) < 0 && mu(i) == 0){
                     Ip(i,i) = 0;
@@ -150,12 +150,12 @@ class QP{
             return Ip;            
         };
 
-        Matrix<nx, 1> ALgradient(Matrix<nx> x, Matrix<m> lambda, Matrix<p> mu, int rho){
+        Matrix<nx, 1> ALgradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, int rho){
             Matrix<nx> Nabla_x_L = primal_residual(x, lambda, mu);
             Matrix<p,p> Ip = coinactfilt(x, mu, rho);
             Matrix<nx> Nabla_x_g; 
             if (m != 0){
-                Nabla_x_g = ~_A || ~G*Ip * dual_residual(x, lambda, mu);
+                Nabla_x_g = ~_A || ~_G*Ip * dual_residual(x, lambda, mu);
             }
             else {
                 Nabla_x_g = ~_G*Ip * dual_residual(x, lambda, mu);
@@ -163,7 +163,7 @@ class QP{
             return Nabla_x_L+Nabla_x_g;
         };
 
-        Matrix<nx,nx> ALhessian(Matrix<nx> x, Matrix<m> lambda, Matrix<p> mu, int rho){
+        Matrix<nx,nx> ALhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, int rho){
             Matrix<nx,nx> Nabla_xx_L = _Q;
             Matrix<p,p> Ip = coinactfilt(x, mu, rho);
             Matrix<nx,nx> Nabla_xx_g; 
@@ -176,11 +176,11 @@ class QP{
             return Nabla_xx_L+Nabla_xx_g;
         };
 
-        Matrix<nx, 1> newton_solve(Matrix<nx> x, Matrix<m> lambda, Matrix<p> mu, int rho){
-            Matrix<nx> x_sol = x;
+        Matrix<nx, 1> newton_solve(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, int rho){
+            Matrix<nx,1> x_sol = x;
             for (int i = 0; i < max_iter_newton; i++){
 
-                Matrix<nx> g = ALgradient(x_sol, lambda, mu, rho);
+                Matrix<nx,1> g = ALgradient(x_sol, lambda, mu, rho);
                 Matrix<1,1> innerprod = ~g * g;
                 double normg = sqrt(innerprod(0));
 
@@ -189,8 +189,9 @@ class QP{
                 }
 
                 Matrix<nx,nx> H = ALhessian(x_sol, lambda, mu, rho);
-                
-                Matrix<nx> Deltax = -Invert(H)*g;
+                Matrix<nx,nx> Hinv;
+                Hinv=Invert(H);
+                Matrix<nx> Deltax = -Hinv*g;
                 x_sol = x_sol+Deltax;    
             }
             return x_sol;
