@@ -6,7 +6,7 @@ void setup() {
    Serial.begin(9600); // Starting Serial Terminal
 
     const int nx = 5;
-    const int m = 5;
+    const int m = 0;
     const int p = 5;
 
     Matrix<nx,nx> Q;
