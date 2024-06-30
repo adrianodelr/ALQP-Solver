@@ -13,6 +13,9 @@ class QP{
     public:
         // updates the qp
         void update(Matrix<nx,nx> Q, Matrix<nx,1> q, Matrix<m,nx> A, Matrix<m,1> b, Matrix<p,nx> G, Matrix<p,1> h){
+            nx = nx;
+            m  = m;
+            p  = p;
             _Q=Q;
             _q=q;
             _A=A;
@@ -20,17 +23,17 @@ class QP{
             _G=G;
             _h=h;            
         }; 
-        // Constructor for empty qp
-        QP(int n_x, int n_eq, int n_in){
-            _n_x  = n_x;
-            _n_eq = n_eq;
-            _n_in = n_in;
-            Matrix<n_x ,n_x> Q;
-            Matrix<n_x ,1>   q;
-            Matrix<n_eq,n_x> A;
-            Matrix<n_eq,1>   b;                        
-            Matrix<n_in,n_x> G;
-            Matrix<n_in,1>   h;   
+        // Default constructor for empty qp
+        QP(){
+            _n_x  = nx;
+            _n_eq = m;
+            _n_in = p;
+            Matrix<nx,nx> Q;
+            Matrix<nx,1>  q;
+            Matrix<m ,nx> A;
+            Matrix<m ,1>  b;                        
+            Matrix<p ,nx> G;
+            Matrix<p ,1>  h;   
             Q.Fill(0.);
             q.Fill(0.);
             A.Fill(0.);
@@ -38,7 +41,7 @@ class QP{
             G.Fill(0.);           
             h.Fill(0.);
             update(Q, q, A, b, G, h);
-
+            
             // fixed solver settings 
             max_iter_newton = 20;
             max_iter_outer  = 50;
