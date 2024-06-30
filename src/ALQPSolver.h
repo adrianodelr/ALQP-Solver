@@ -13,9 +13,6 @@ class QP{
     public:
         // updates the qp
         void update(Matrix<nx,nx> Q, Matrix<nx,1> q, Matrix<m,nx> A, Matrix<m,1> b, Matrix<p,nx> G, Matrix<p,1> h){
-            nx = nx;
-            m  = m;
-            p  = p;
             _Q=Q;
             _q=q;
             _A=A;
@@ -25,9 +22,6 @@ class QP{
         }; 
         // Default constructor for empty qp
         QP(){
-            _n_x  = nx;
-            _n_eq = m;
-            _n_in = p;
             Matrix<nx,nx> Q;
             Matrix<nx,1>  q;
             Matrix<m ,nx> A;
@@ -41,7 +35,7 @@ class QP{
             G.Fill(0.);           
             h.Fill(0.);
             update(Q, q, A, b, G, h);
-            
+
             // fixed solver settings 
             max_iter_newton = 20;
             max_iter_outer  = 50;
@@ -79,10 +73,6 @@ class QP{
         };
 
     private: 
-        // QP dimensions 
-        int _n_x;                   // dimension of the search space 
-        int _n_eq;                  // number of equalities 
-        int _n_ineq;                // number of inequalities 
         // QP matrices 
         Matrix<nx,nx> _Q;           // quadratic coefficient matrix  
         Matrix<nx,1>  _q;           // linear coefficient vector 
