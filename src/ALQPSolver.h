@@ -38,6 +38,15 @@ class QP{
             G.Fill(0.);           
             h.Fill(0.);
             update(Q, q, A, b, G, h);
+
+            // fixed solver settings 
+            max_iter_newton = 20;
+            max_iter_outer  = 50;
+
+            precision_newton = 1e-5;
+            penalty_initial  = 10.0;
+            penalty_scaling  = 10.0;
+            precision_primal = 1e-6;
         }; 
         // solving the qp
         Matrix<nx,1> solve(){
@@ -80,13 +89,13 @@ class QP{
         Matrix<p ,1>  _h;           // inequality constraint vector 
         
         // Solver settings
-        size_t max_iter_newton 20;
-        size_t max_iter_outer 50;
+        size_t max_iter_newton;
+        size_t max_iter_outer;
 
-        double precision_newton 1e-5;
-        double penalty_initial 10.0;
-        double penalty_scaling 10.0;
-        double precision_primal 1e-6;
+        double precision_newton;
+        double penalty_initial;
+        double penalty_scaling;
+        double precision_primal;
 
         // returns left hand side of the equality constraints   
         Matrix<m,1> c_eq(Matrix<nx,1> x){
