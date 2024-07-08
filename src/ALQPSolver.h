@@ -37,19 +37,19 @@ class QP{
             update(Q, q, A, b, G, h);
 
             // fixed solver settings 
-            max_iter_newton = 20;
-            max_iter_outer  = 50;
+            max_iter_newton = 10;
+            max_iter_outer  = 10;
 
-            precision_newton = 1e-5;
-            penalty_initial  = 10.0;
+            precision_newton = 1e-8;
+            penalty_initial  = 1.00;
             penalty_scaling  = 10.0;
-            precision_primal = 1e-6;
+            precision_primal = 1e-8;
         }; 
         // solving the qp
         Matrix<nx,1> solve(){
-            Matrix<nx> x;
-            Matrix<m> lambda;
-            Matrix<p> mu;     
+            Matrix<nx,1> x;
+            Matrix<m ,1> lambda;
+            Matrix<p ,1> mu;     
             x.Fill(0);
             lambda.Fill(0);
             mu.Fill(0);
@@ -100,12 +100,16 @@ class QP{
         };
 
         Matrix<nx,1> primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
-            if (m != 0){
-                return x + _q + ~_A*lambda +  ~_G*mu;
+            // Since basic linear algebra seems not to perform addition well with empty matrices use below approach 
+            // return _Q*x + _q + ~_A*lambda +  ~_G*mu; 
+            Matrix<nx,1> pr = _Q*x + _q; 
+            if (m != 0) {
+                pr += ~_A*lambda;
             }
-            else{
-                return _Q*x + _q + ~_G*mu;
-            }            
+            if (p != 0){
+                pr += ~_G*mu;
+            }
+            return pr;
         }; 
 
         Matrix<m+p,1>  dual_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
@@ -114,15 +118,10 @@ class QP{
             for (int i = 0; i < p; i++){
                 h(i) = max(h(i), 0);
             }
-            if (m != 0){
-                return c && h;
-            }
-            else{
-                return h;
-            }            
+            return c && h;
         };
 
-        void dual_update(Matrix<nx,1> x, Matrix<m,1> &lambda, Matrix<p> &mu, int rho){
+        void dual_update(Matrix<nx,1> x, Matrix<m,1> &lambda, Matrix<p> &mu, float rho){
             Matrix<p,1> c = c_in(x);
             Matrix<m,1> h = c_eq(x);
             for (int i = 0; i < p; i++){
@@ -135,7 +134,7 @@ class QP{
             }            
         };
         
-        Matrix<p,p> coinactfilt(Matrix<nx,1> x, Matrix<p,1> mu, int rho){
+        Matrix<p,p> coinactfilt(Matrix<nx,1> x, Matrix<p,1> mu, float rho){
             Matrix<p,p> Ip;
             Ip.Fill(0);
             Matrix<p,1> h = c_in(x);
@@ -150,25 +149,20 @@ class QP{
             return Ip;            
         };
 
-        Matrix<nx, 1> ALgradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, int rho){
+        Matrix<nx, 1> ALgradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, float rho){
             Matrix<nx> Nabla_x_L = primal_residual(x, lambda, mu);
             Matrix<p,p> Ip = coinactfilt(x, mu, rho);
             Matrix<nx> Nabla_x_g; 
-            if (m != 0){
-                Nabla_x_g = ~_A || ~_G*Ip * dual_residual(x, lambda, mu);
-            }
-            else {
-                Nabla_x_g = ~_G*Ip * dual_residual(x, lambda, mu);
-            }    
+            Nabla_x_g = (~_A*rho || ~_G*Ip) * dual_residual(x, lambda, mu);
             return Nabla_x_L+Nabla_x_g;
         };
 
-        Matrix<nx,nx> ALhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, int rho){
+        Matrix<nx,nx> ALhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho){
             Matrix<nx,nx> Nabla_xx_L = _Q;
             Matrix<p,p> Ip = coinactfilt(x, mu, rho);
             Matrix<nx,nx> Nabla_xx_g; 
             if (m != 0){
-                Nabla_xx_g = (~_A || ~_G*Ip) * (_A && _G);
+                Nabla_xx_g = (~_A*rho || ~_G*Ip) * (_A && _G);
             }
             else {
                 Nabla_xx_g = (~_G*Ip) * (_G);
@@ -176,11 +170,12 @@ class QP{
             return Nabla_xx_L+Nabla_xx_g;
         };
 
-        Matrix<nx, 1> newton_solve(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, int rho){
+        Matrix<nx, 1> newton_solve(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho){
             Matrix<nx,1> x_sol = x;
             for (int i = 0; i < max_iter_newton; i++){
 
                 Matrix<nx,1> g = ALgradient(x_sol, lambda, mu, rho);
+
                 Matrix<1,1> innerprod = ~g * g;
                 double normg = sqrt(innerprod(0));
 
@@ -189,9 +184,8 @@ class QP{
                 }
 
                 Matrix<nx,nx> H = ALhessian(x_sol, lambda, mu, rho);
-                Matrix<nx,nx> Hinv;
-                Hinv=Invert(H);
-                Matrix<nx> Deltax = -Hinv*g;
+                // build in something for feasibility checking 
+                Matrix<nx> Deltax = -Inverse(H)*g;
                 x_sol = x_sol+Deltax;    
             }
             return x_sol;
