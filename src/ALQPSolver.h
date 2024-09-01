@@ -11,9 +11,11 @@ namespace ALQPS {
 template<int nx, int m, int p>
 class QPsol{
     public:
-        QPsol(Matrix<nx,1> x_, Matrix<m,1> lambda_, Matrix<p,1> mu_, float obj_val_, bool solved, bool pinf, bool dinf) : x(x_), lambda(lambda_), mu(mu_), obj_val(obj_val_), _solved(solved), _pinf(pinf), _dinf(dinf) {}; 
+        QPsol(Matrix<nx,1> x_, Matrix<m,1> lambda_, Matrix<p,1> mu_, float obj_val_, bool solved, bool pinf, bool dinf, bool verbose) : x(x_), lambda(lambda_), mu(mu_), obj_val(obj_val_), _solved(solved), _pinf(pinf), _dinf(dinf) {
+            if (verbose) print_report();
+        }; 
 
-        // primal and dual variables
+        // primal and dual variables (dropping of private/public member notation "_var" for making things more userfriendly)
         Matrix<nx,1> x;
         Matrix<m ,1> lambda;                        
         Matrix<p ,1> mu;
@@ -21,7 +23,28 @@ class QPsol{
         const float obj_val;         
         const bool _solved;
         const bool _pinf;
-        const bool _dinf;            
+        const bool _dinf;  
+
+        void print_report(){
+            
+            Serial.print("status: ");
+            if (_solved) Serial.println("solved");
+            else if (_pinf) Serial.println("primal infeasible");
+            else if (_dinf) Serial.println("dual infeasible");  
+
+            Serial.print("optimal objective: ");
+            Serial.println(obj_val);
+
+            Serial.print("primal value (solution): ");
+            Serial.println(x);
+
+            Serial.print("dual value (equalities): ");
+            Serial.println(lambda);
+
+            Serial.print("dual value (inequalities): ");
+            Serial.println(mu);
+
+        }          
 };
 
 template<int nx, int m, int p>
@@ -61,8 +84,13 @@ class QP{
             penalty_scaling  = 10.0;
             precision_primal = 1e-8;
         }; 
+
         // solving the qp
-        QPsol<nx,m,p> solve(){
+        QPsol<nx,m,p> solve(String mode = "nonverbose"){
+            
+            bool verb = false;
+            if (mode=="verbose") verb=true;
+
             Matrix<nx,1> x;
             Matrix<m ,1> lambda;
             Matrix<p ,1> mu;     
@@ -85,27 +113,23 @@ class QP{
                 rp = primal_residual(x, lambda, mu);
                 innerprod = ~rp * rp;
                 normrp = sqrt(innerprod(0));
-                // verify conditions if subset of KKT conditions are satisfied 
+                // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
                 if (normrp < precision_primal && dual_feasibility(mu)){
-                
-                    QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false);                    
+                    QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,verb);                    
                     return sol;
                 }
             }
+            x.Fill(0.0/0.0);
             if (normrp > precision_primal){
-                x.Fill(0.0/0.0);
-                QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,true,false);                    
-                Serial.println("Problem is primal infeasible");
-                return sol;
+                QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,true,false,verb);
+                return sol;                     
             }
-            if (!dual_feasibility(mu)){
-                x.Fill(0.0/0.0);
-                QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,false,true);
-                Serial.println("Problem is dual infeasible");
+            else if (!dual_feasibility(mu)){
+                QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,false,true,verb);
                 return sol;
             }
         };
-        //QPsol<nx,m,p> sol;
+
     private: 
         // QP matrices 
         Matrix<nx,nx> _Q;           // quadratic coefficient matrix  
