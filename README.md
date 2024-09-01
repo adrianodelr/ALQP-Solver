@@ -12,6 +12,6 @@ $$\begin{align}
 &  \mathbf{G}\mathbf{x} - \mathbf{h} \leq \mathbf{0} 
 \end{align}$$
 
-Here $\mathbf{Q}$, $\mathbf{q}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Equality constraints are represented by matrix $\mathbf{A}$ and vector $\mathbf{b}$, inequality constraints 
-by matrix~$\mathbf{G}$ and vector~$\mathbf{h}$.
+Here $\mathbf{Q}$ and $\mathbf{q}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Equality constraints are represented by matrix $\mathbf{A}$ and vector $\mathbf{b}$, inequality constraints 
+by matrix $\mathbf{G}$ and vector $\mathbf{h}$.
 
