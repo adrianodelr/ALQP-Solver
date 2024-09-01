@@ -32,10 +32,33 @@ Matrix<m ,1> b = {3, 1};
 Matrix<p ,n> G = {-1, 1, 0, -1};
 Matrix<p ,1> h = {1, 1};
 ```
-The QP is build as follows and can updated sequentially at runtime, as e.g. required by a model predictive controller:  
+The QP is built as follows and can updated sequentially at runtime, as e.g. required by a model predictive controller:  
 
 ```cpp
 // build and update the quadratic program 
 QP<nx,m,p> qp; 
 qp.update(Q,q,A,b,G,h); 
 ```
+Solving the QP will return a solution object which, alongside the solution, contains values of the according dual variables and information about success of the solver. 
+```cpp
+// solve QP 
+auto sol = qp.solve(); 
+// access solution and value of objective at optimum 
+Matrix<n,1> x_opt = sol.x;
+float obj_val = sol.obj_val;
+// 
+```
+It is also possible to print a solver status report by setting a  default argument to verbose":        
+```cpp
+// solve QP 
+auto sol = qp.solve("verbose"); 
+```
+This will result in following output printed to the console 
+```bash
+status: solved
+optimal objective: -2.62
+primal value (solution): [[3.08],[-0.08]]
+dual value (equalities): [[-1.69],[-1.54]]
+dual value (inequalities): [[0.00],[0.00]]
+```
+
