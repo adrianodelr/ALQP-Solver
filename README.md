@@ -12,7 +12,7 @@ $$\begin{align}
 &  \mathbf{G}\mathbf{x} - \mathbf{h} \leq \mathbf{0} 
 \end{align}$$
 
-Here $\mathbf{Q} \in \mathbb{R}^{n \times n}$ and $\mathbf{q}\in \mathbb{R}^{n}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Here $n$ is the dimension of the search space. Equality constraints are represented by matrix $\mathbf{A}\in \mathbb{R}^{m \times n}$ and vector $\mathbf{b}\in \mathbb{R}^m$, inequality constraints by matrix $\mathbf{G} \in \mathbb{R}^{p \times n}$ and vector $\mathbf{h}\in \mathbb{R}^p$. The number of equality constraints is $m$, the number of inequality constraints is $p$. (This notation also is used throughout the code, and is conform with the notation used in the tutorial linked above.)
+Here $\mathbf{Q} \in \mathbb{R}^{n \times n}$ and $\mathbf{q}\in \mathbb{R}^{n}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Equality constraints are represented by matrix $\mathbf{A}\in \mathbb{R}^{m \times n}$ and vector $\mathbf{b}\in \mathbb{R}^m$, inequality constraints by matrix $\mathbf{G} \in \mathbb{R}^{p \times n}$ and vector $\mathbf{h}\in \mathbb{R}^p$. (This notation also is used throughout the code, and is conform with the notation used in the tutorial linked above.)
 
 
 
