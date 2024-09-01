@@ -39,21 +39,20 @@ The QP is built as follows and can updated sequentially at runtime, as e.g. requ
 QP<nx,m,p> qp; 
 qp.update(Q,q,A,b,G,h); 
 ```
-Solving the QP will return a solution object which, alongside the solution, contains values of the according dual variables and information about success of the solver. 
+Solving the QP will return a solution object which, alongside the solution, contains values of the according dual variables, the objective value, and information about success of the solver. 
 ```cpp
 // solve QP 
 auto sol = qp.solve(); 
 // access solution and value of objective at optimum 
 Matrix<n,1> x_opt = sol.x;
 float obj_val = sol.obj_val;
-// 
 ```
-It is also possible to print a solver status report by setting a  default argument to verbose":        
+It is also possible to print a solver status report by setting a  default argument to "verbose":        
 ```cpp
 // solve QP 
 auto sol = qp.solve("verbose"); 
 ```
-This will result in following output printed to the console 
+This will result in following output printed to the console. In case of primal or dual feasibility the status changes accordingly.  
 ```bash
 status: solved
 optimal objective: -2.62
