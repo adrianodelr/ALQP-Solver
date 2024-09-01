@@ -9,6 +9,42 @@ using namespace BLA;
 namespace ALQPS {
 
 template<int nx, int m, int p>
+class QPsol{
+    public:
+        // updates the qp solution
+        void update(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float objective, bool solved, bool pinf, bool dinf){
+            _x=x;
+            _lambda=lambda;                        
+            _mu=mu;
+            _obj_val=objective;
+            _solved=solved;
+            _pinf=pinf;
+            _dinf=dinf;            
+        }; 
+
+        QPsol(){
+            // initialize primal, dual variables as zero and objective as NaN 
+            Matrix<nx,1> x;
+            Matrix<m ,1> lambda;                        
+            Matrix<p ,1> mu;   
+            x.Fill(0.);
+            lambda.Fill(0.);            
+            mu.Fill(0.);
+
+            update(x,lambda,mu,0.0,false,false,false);    
+        }; 
+        // primal and dual variables
+        Matrix<nx,1>  _x;
+        Matrix<m ,1>  _lambda;                        
+        Matrix<p ,1>  _mu;
+        // objective value and status variables   
+        float _obj_val;         
+        bool _solved;
+        bool _pinf;
+        bool _dinf;            
+};
+
+template<int nx, int m, int p>
 class QP{
     public:
         // updates the qp
@@ -46,7 +82,7 @@ class QP{
             precision_primal = 1e-8;
         }; 
         // solving the qp
-        Matrix<nx,1> solve(){
+        QPsol<nx,m,p> solve(){
             Matrix<nx,1> x;
             Matrix<m ,1> lambda;
             Matrix<p ,1> mu;     
@@ -63,26 +99,31 @@ class QP{
 
             for (int i = 0; i < max_iter_outer; i++){
                 x = newton_solve(x, lambda, mu, rho);
-                // update parameters lambda,mu
+                // update dual variables lambda, mu
                 dual_update(x, lambda, mu, rho); 
                 rho = Phi*rho;
                 rp = primal_residual(x, lambda, mu);
                 innerprod = ~rp * rp;
                 normrp = sqrt(innerprod(0));
+                // verify conditions if subset of KKT conditions are satisfied 
                 if (normrp < precision_primal && dual_feasibility(mu)){
-                    Serial.println("Found optimal solution");
-                    return x;
+                
+                    sol.update(x,lambda,mu,objective(x),true,false,false);                    
+                    // Serial.println("Found optimal solution");
+                    return sol;
                 }
             }
             if (normrp > precision_primal){
+                sol.update(x,lambda,mu,objective(x),false,true,false);                    
                 Serial.println("Problem is primal infeasible");
             }
             if (!dual_feasibility(mu)){
+                sol.update(x,lambda,mu,objective(x),false,false,true);                    
                 Serial.println("Problem is dual infeasible");
             }
-            return x;
+            return sol;
         };
-
+        QPsol<nx,m,p> sol;
     private: 
         // QP matrices 
         Matrix<nx,nx> _Q;           // quadratic coefficient matrix  
@@ -109,6 +150,11 @@ class QP{
         Matrix<p,1> c_in(Matrix<nx,1> x){
             return _G*x - _h;
         };
+        // computes the objective value 
+        float objective(Matrix<nx,1> x){
+            return 0.5*(~x*_Q*x)(0) + (~_q*x)(0);             
+        };
+
 
         Matrix<nx,1> stationarity(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
             // Since basic linear algebra seems not to perform addition well with empty matrices use below approach 
@@ -122,6 +168,7 @@ class QP{
             }
             return pr;
         }; 
+        
         Matrix<m+p,1>  primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
             Matrix<m,1> c = c_eq(x);
             Matrix<p,1> h = c_in(x);
