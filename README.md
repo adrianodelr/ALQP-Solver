@@ -15,8 +15,9 @@ $$\begin{align}
 Here $\mathbf{Q} \in \mathbb{R}^{n \times n}$ and $\mathbf{q}\in \mathbb{R}^{n}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Equality constraints are represented by matrix $\mathbf{A}\in \mathbb{R}^{m \times n}$ and vector $\mathbf{b}\in \mathbb{R}^m$, inequality constraints by matrix $\mathbf{G} \in \mathbb{R}^{p \times n}$ and vector $\mathbf{h}\in \mathbb{R}^p$. (This notation also is used throughout the code, and is conform with the notation used in the tutorial linked above.)
 
 ## Usage
-Defining a QP is fairly simple. Matrices can be build according to the documentation of the Basic Linear Algebra library linked above:
-```
+Defining a QP is fairly simple. Matrices can be built according to the documentation of the Basic Linear Algebra library linked above:
+```cpp
+// QP dimensions
 const int n = 2;
 const int m = 2;
 const int p = 2;
@@ -31,6 +32,10 @@ Matrix<m ,1> b = {3, 1};
 Matrix<p ,n> G = {-1, 1, 0, -1};
 Matrix<p ,1> h = {1, 1};
 ```
-    
+The QP is build as follows and can updated sequentially at runtime, as e.g. required by a model predictive controller:  
 
-
+```cpp
+// build and update the quadratic program 
+QP<nx,m,p> qp; 
+qp.update(Q,q,A,b,G,h); 
+```
