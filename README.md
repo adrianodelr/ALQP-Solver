@@ -7,7 +7,7 @@ For more help, you can also check out [this tutorial given by Kevin Tracy](https
 
 ## Constrained QP formulation
 $$\begin{align}
-\min_x \quad & \frac{1}{2}\mathbf{x}^T\mathbf{Q}\mathbf{x} + \mathbf{q}^T\mathbf{x} \\ 
+\min_{\mathbf{x}} \quad & \frac{1}{2}\mathbf{x}^T\mathbf{Q}\mathbf{x} + \mathbf{q}^T\mathbf{x} \\ 
 \mbox{s.t.}\quad &  \mathbf{A}\mathbf{x} -\mathbf{b} = \mathbf{0} \\ 
 &  \mathbf{G}\mathbf{x} - \mathbf{h} \leq \mathbf{0} 
 \end{align}$$
