@@ -13,5 +13,5 @@ $$\begin{align}
 \end{align}$$
 
 Here $\mathbf{Q}$, $\mathbf{q}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Equality constraints are represented by matrix $\mathbf{A}$ and vector $\mathbf{b}$, inequality constraints 
-by matrix $\mathbf{G}$ and vector $\mathbf{h}$.
+by matrix~$\mathbf{G}$ and vector~$\mathbf{h}$.
 
