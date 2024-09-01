@@ -62,7 +62,7 @@ class QP{
                 // update parameters lambda,mu
                 dual_update(x, lambda, mu, rho); 
                 rho = Phi*rho;
-                Matrix<m+p> rd = dual_residual(x, lambda, mu);
+                Matrix<m+p> rd = primal_residual(x, lambda, mu);
                 Matrix<1,1> innerprod = ~rd * rd;
                 double normdr = sqrt(innerprod(0));
                 if (normdr < precision_primal){
@@ -99,7 +99,7 @@ class QP{
             return _G*x - _h;
         };
 
-        Matrix<nx,1> primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
+        Matrix<nx,1> stationarity(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
             // Since basic linear algebra seems not to perform addition well with empty matrices use below approach 
             // return _Q*x + _q + ~_A*lambda +  ~_G*mu; 
             Matrix<nx,1> pr = _Q*x + _q; 
@@ -111,8 +111,7 @@ class QP{
             }
             return pr;
         }; 
-
-        Matrix<m+p,1>  dual_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
+        Matrix<m+p,1>  primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
             Matrix<m,1> c = c_eq(x);
             Matrix<p,1> h = c_in(x);
             for (int i = 0; i < p; i++){
@@ -134,7 +133,7 @@ class QP{
             }            
         };
         
-        Matrix<p,p> coinactfilt(Matrix<nx,1> x, Matrix<p,1> mu, float rho){
+        Matrix<p,p> active_set(Matrix<nx,1> x, Matrix<p,1> mu, float rho){
             Matrix<p,p> Ip;
             Ip.Fill(0);
             Matrix<p,1> h = c_in(x);
@@ -149,17 +148,17 @@ class QP{
             return Ip;            
         };
 
-        Matrix<nx, 1> ALgradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, float rho){
-            Matrix<nx> Nabla_x_L = primal_residual(x, lambda, mu);
-            Matrix<p,p> Ip = coinactfilt(x, mu, rho);
+        Matrix<nx, 1> algradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, float rho){
+            Matrix<nx> Nabla_x_L = stationarity(x, lambda, mu);
+            Matrix<p,p> Ip = active_set(x, mu, rho);
             Matrix<nx> Nabla_x_g; 
-            Nabla_x_g = (~_A*rho || ~_G*Ip) * dual_residual(x, lambda, mu);
+            Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu);
             return Nabla_x_L+Nabla_x_g;
         };
 
-        Matrix<nx,nx> ALhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho){
+        Matrix<nx,nx> alhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho){
             Matrix<nx,nx> Nabla_xx_L = _Q;
-            Matrix<p,p> Ip = coinactfilt(x, mu, rho);
+            Matrix<p,p> Ip = active_set(x, mu, rho);
             Matrix<nx,nx> Nabla_xx_g; 
             if (m != 0){
                 Nabla_xx_g = (~_A*rho || ~_G*Ip) * (_A && _G);
@@ -174,7 +173,7 @@ class QP{
             Matrix<nx,1> x_sol = x;
             for (int i = 0; i < max_iter_newton; i++){
 
-                Matrix<nx,1> g = ALgradient(x_sol, lambda, mu, rho);
+                Matrix<nx,1> g = algradient(x_sol, lambda, mu, rho);
 
                 Matrix<1,1> innerprod = ~g * g;
                 double normg = sqrt(innerprod(0));
@@ -183,7 +182,7 @@ class QP{
                     return x_sol;
                 }
 
-                Matrix<nx,nx> H = ALhessian(x_sol, lambda, mu, rho);
+                Matrix<nx,nx> H = alhessian(x_sol, lambda, mu, rho);
                 // build in something for feasibility checking 
                 Matrix<nx> Deltax = -Inverse(H)*g;
                 x_sol = x_sol+Deltax;    
