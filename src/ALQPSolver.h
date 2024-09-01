@@ -57,17 +57,28 @@ class QP{
             double rho = penalty_initial;
             double Phi = penalty_scaling;
 
+            Matrix<m+p> rp;
+            Matrix<1,1> innerprod;
+            double normrp;
+
             for (int i = 0; i < max_iter_outer; i++){
                 x = newton_solve(x, lambda, mu, rho);
                 // update parameters lambda,mu
                 dual_update(x, lambda, mu, rho); 
                 rho = Phi*rho;
-                Matrix<m+p> rd = primal_residual(x, lambda, mu);
-                Matrix<1,1> innerprod = ~rd * rd;
-                double normdr = sqrt(innerprod(0));
-                if (normdr < precision_primal){
+                rp = primal_residual(x, lambda, mu);
+                innerprod = ~rp * rp;
+                normrp = sqrt(innerprod(0));
+                if (normrp < precision_primal && dual_feasibility(mu)){
+                    Serial.println("Found optimal solution");
                     return x;
                 }
+            }
+            if (normrp > precision_primal){
+                Serial.println("Problem is primal infeasible");
+            }
+            if (!dual_feasibility(mu)){
+                Serial.println("Problem is dual infeasible");
             }
             return x;
         };
@@ -119,6 +130,13 @@ class QP{
             }
             return c && h;
         };
+
+        bool dual_feasibility(Matrix<p,1> mu){
+            for (int i = 0; i < p; i++){
+                if(mu(i) < 0.0) return false;
+            }
+            return true;
+        }
 
         void dual_update(Matrix<nx,1> x, Matrix<m,1> &lambda, Matrix<p> &mu, float rho){
             Matrix<p,1> c = c_in(x);
