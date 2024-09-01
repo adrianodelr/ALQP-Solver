@@ -39,7 +39,7 @@ The QP is built as follows and can updated sequentially at runtime, as e.g. requ
 QP<nx,m,p> qp; 
 qp.update(Q,q,A,b,G,h); 
 ```
-Solving the QP will return a solution object which, alongside the solution, contains values of the according dual variables, the objective value, and information about success of the solver. 
+Solving the QP will return a solution object which, alongside the primal solution, contains values of the according dual variables, the objective value, and information about success of the solver. 
 ```cpp
 // solve QP 
 auto sol = qp.solve(); 
