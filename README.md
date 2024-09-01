@@ -14,7 +14,23 @@ $$\begin{align}
 
 Here $\mathbf{Q} \in \mathbb{R}^{n \times n}$ and $\mathbf{q}\in \mathbb{R}^{n}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Equality constraints are represented by matrix $\mathbf{A}\in \mathbb{R}^{m \times n}$ and vector $\mathbf{b}\in \mathbb{R}^m$, inequality constraints by matrix $\mathbf{G} \in \mathbb{R}^{p \times n}$ and vector $\mathbf{h}\in \mathbb{R}^p$. (This notation also is used throughout the code, and is conform with the notation used in the tutorial linked above.)
 
+## Usage
+Defining a QP is fairly simple. Matrices can be build according to the documentation of the Basic Linear Algebra library linked above:
+```
+const int n = 2;
+const int m = 2;
+const int p = 2;
 
-
+// quadratic objective
+Matrix<n,n> Q = {2, 0, 2, 0};
+Matrix<n,1> q = {-4, -6};
+// equality constraints 
+Matrix<m ,n> A = {1, 1, 0.3, -1};
+Matrix<m ,1> b = {3, 1};
+// inequality constraints  
+Matrix<p ,n> G = {-1, 1, 0, -1};
+Matrix<p ,1> h = {1, 1};
+```
+    
 
 
