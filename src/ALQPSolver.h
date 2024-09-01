@@ -12,33 +12,22 @@ template<int nx, int m, int p>
 class QPsol{
     public:
         // updates the qp solution
-        void update(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float objective, bool solved, bool pinf, bool dinf){
-            _x=x;
-            _lambda=lambda;                        
-            _mu=mu;
-            _obj_val=objective;
+        void update(Matrix<nx,1> x_, Matrix<m,1> lambda_, Matrix<p,1> mu_, float obj_val_, bool solved, bool pinf, bool dinf){
+            x=x_;
+            lambda=lambda_;                        
+            mu=mu_;
+            obj_val=obj_val_;
             _solved=solved;
             _pinf=pinf;
             _dinf=dinf;            
         }; 
-
-        QPsol(){
-            // initialize primal, dual variables as zero and objective as NaN 
-            Matrix<nx,1> x;
-            Matrix<m ,1> lambda;                        
-            Matrix<p ,1> mu;   
-            x.Fill(0.);
-            lambda.Fill(0.);            
-            mu.Fill(0.);
-
-            update(x,lambda,mu,0.0,false,false,false);    
-        }; 
-        // primal and dual variables
-        Matrix<nx,1>  _x;
-        Matrix<m ,1>  _lambda;                        
-        Matrix<p ,1>  _mu;
+        QPsol(){}; 
+        // primal and dual variables (dropping of private/public member notation "_var" for making things more userfriendly)
+        Matrix<nx,1> x;
+        Matrix<m ,1> lambda;                        
+        Matrix<p ,1> mu;
         // objective value and status variables   
-        float _obj_val;         
+        float obj_val;         
         bool _solved;
         bool _pinf;
         bool _dinf;            
@@ -114,16 +103,18 @@ class QP{
                 }
             }
             if (normrp > precision_primal){
-                sol.update(x,lambda,mu,objective(x),false,true,false);                    
+                x.Fill(0.0/0.0);
+                sol.update(x,lambda,mu,0.0/0.0,false,true,false);                    
                 Serial.println("Problem is primal infeasible");
             }
             if (!dual_feasibility(mu)){
-                sol.update(x,lambda,mu,objective(x),false,false,true);                    
+                x.Fill(0.0/0.0);
+                sol.update(x,lambda,mu,0.0/0.0,false,false,true);                    
                 Serial.println("Problem is dual infeasible");
             }
             return sol;
         };
-        QPsol<nx,m,p> sol;
+        const QPsol<nx,m,p> sol;
     private: 
         // QP matrices 
         Matrix<nx,nx> _Q;           // quadratic coefficient matrix  
@@ -155,7 +146,6 @@ class QP{
             return 0.5*(~x*_Q*x)(0) + (~_q*x)(0);             
         };
 
-
         Matrix<nx,1> stationarity(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
             // Since basic linear algebra seems not to perform addition well with empty matrices use below approach 
             // return _Q*x + _q + ~_A*lambda +  ~_G*mu; 
@@ -168,7 +158,7 @@ class QP{
             }
             return pr;
         }; 
-        
+
         Matrix<m+p,1>  primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
             Matrix<m,1> c = c_eq(x);
             Matrix<p,1> h = c_in(x);
@@ -246,9 +236,7 @@ class QP{
                 if (normg < precision_newton){
                     return x_sol;
                 }
-
                 Matrix<nx,nx> H = alhessian(x_sol, lambda, mu, rho);
-                // build in something for feasibility checking 
                 Matrix<nx> Deltax = -Inverse(H)*g;
                 x_sol = x_sol+Deltax;    
             }
