@@ -79,12 +79,12 @@ class QP{
 
             // fixed solver settings 
             max_iter_newton = 25;
-            max_iter_outer  = 10;
+            max_iter_outer  = 25;
 
-            precision_newton = 1e-8;
+            precision_newton = 1e-6;
             penalty_initial  = 1.00;
             penalty_scaling  = 10.0;
-            precision_primal = 1e-8;
+            precision_primal = 1e-6;
         }; 
 
         // solving the qp
@@ -112,18 +112,20 @@ class QP{
                 if (isnan(x(0))){
                     QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,false,false,true,verb);
                     return sol;
-                }
-                // if (m+p == 0){
-                //     QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);
-                //     return sol;
-                // }
-                
+                }                
+                if (m+p == 0){
+                    QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);
+                    return sol;
+                } 
+                                
                 // update dual variables lambda, mu
                 dual_update(x, lambda, mu, rho); 
                 rho = Phi*rho;
+
                 rp = primal_residual(x, lambda, mu);
                 innerprod = ~rp * rp;
                 normrp = sqrt(innerprod(0));
+
                 // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
                 if (normrp < precision_primal && dual_feasibility(mu)){
                     QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);                    
@@ -173,8 +175,6 @@ class QP{
         };
 
         Matrix<nx,1> stationarity(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
-            // Since basic linear algebra seems not to perform addition well with empty matrices use below approach 
-            // return _Q*x + _q + ~_A*lambda +  ~_G*mu; 
             Matrix<nx,1> pr = _Q*x + _q; 
             if (m != 0) {
                 pr += ~_A*lambda;
@@ -229,23 +229,45 @@ class QP{
 
         Matrix<nx, 1> algradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, float rho){
             Matrix<nx> Nabla_x_L = stationarity(x, lambda, mu);
-            Matrix<p,p> Ip = active_set(x, mu, rho);
-            Matrix<nx> Nabla_x_g; 
-            Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu);
-            return Nabla_x_L+Nabla_x_g;
+            // Matrix<p,p> Ip = active_set(x, mu, rho);
+            // Matrix<nx> Nabla_x_g; 
+            // Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu);
+            // return Nabla_x_L+Nabla_x_g;            
+            // TODO check wether (~_G*Ip) should be multiplied with inequalities directly or first max(h(i), 0) is applied ? probably not important as inactive
+            if (m+p == 0){
+                return Nabla_x_L;
+            }
+            else {
+                Matrix<nx> Nabla_x_g; 
+                Nabla_x_g.Fill(0);
+                if(m != 0){
+                    Nabla_x_g += (~_A*rho) * c_eq(x);    
+                }
+                if(p != 0){
+                    Matrix<p,p> Ip = active_set(x, mu, rho);
+                    Nabla_x_g += (~_G*Ip) * c_in(x);
+                }
+                return Nabla_x_L+Nabla_x_g;
+            }            
         };
 
         Matrix<nx,nx> alhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho){
             Matrix<nx,nx> Nabla_xx_L = _Q;
-            Matrix<p,p> Ip = active_set(x, mu, rho);
-            Matrix<nx,nx> Nabla_xx_g; 
-            if (m != 0){
-                Nabla_xx_g = (~_A*rho || ~_G*Ip) * (_A && _G);
+            if (m+p == 0){
+                return Nabla_xx_L;
             }
             else {
-                Nabla_xx_g = (~_G*Ip) * (_G);
-            }    
-            return Nabla_xx_L+Nabla_xx_g;
+                Matrix<nx,nx> Nabla_xx_g; 
+                Nabla_xx_g.Fill(0);
+                if(m != 0){
+                    Nabla_xx_g += (~_A*rho) * (_A);    
+                }
+                if(p != 0){
+                    Matrix<p,p> Ip = active_set(x, mu, rho);
+                    Nabla_xx_g += (~_G*Ip) * (_G);
+                }
+                return Nabla_xx_L+Nabla_xx_g;
+            }
         };
 
         Matrix<nx, 1> newton_solve(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho, bool verb){
@@ -253,15 +275,15 @@ class QP{
             for (int i = 0; i < max_iter_newton; i++){
 
                 Matrix<nx,1> g = algradient(x_sol, lambda, mu, rho);
-
                 Matrix<1,1> innerprod = ~g * g;
                 double normg = sqrt(innerprod(0));
-
+                
                 if (normg < precision_newton){
                     return x_sol;
                 }
+
                 Matrix<nx,nx> H = alhessian(x_sol, lambda, mu, rho);
-                
+
                 // If Hessian of augmented Lagrangian is rank defficient abort procedure 
                 if (Determinant(H)==0.0){
                     x_sol.Fill(0.0/0.0);
@@ -270,7 +292,6 @@ class QP{
                 Matrix<nx> Deltax = -Inverse(H)*g;
                 x_sol = x_sol+Deltax;    
             }
-            Serial.println("no convergence");
             return x_sol;
         };
     };
