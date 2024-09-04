@@ -76,7 +76,7 @@ QP<nx,m,p> qp;
 qp.update(Q,q,{},{},{},{});      
 ```
 
-## Infeasibility detection and handling 
+### Infeasibility detection and handling 
 The solver will check for stationarity, as well as primal and dual feasibility, when solving a constrained QP. If the QP is unconstrained, only stationarity is considered. In case the solver fails to converge, or feasibility is not achieved, the primal solution and objective in the returned solution object will be set to NaN. In verbose mode, this will be visible in the solver's status report.
 
 ```bash
@@ -85,6 +85,9 @@ optimal optimal objective: nan
 primal value (solution): [[nan],[nan]]
 ...
 ```
+Another reason for failure could be rank deficiency of the Hessian of the augmented Lagrangian. The user will be informed in this case as well. However, the user is responsible for providing a convex QP, with $\mathbf{Q}$ being symmetric positive (semi) definite.
+
+
 
 
 
