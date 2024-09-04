@@ -72,7 +72,7 @@ const int p = 0;
 Matrix<n,n> Q = {1, 0, 0, 1};
 Matrix<n,1> q = {1, -1};
 // build and update the quadratic program 
-QP<nx,m,p> qp; 
+QP<n,m,p> qp; 
 qp.update(Q,q,{},{},{},{});      
 ```
 
