@@ -14,7 +14,7 @@ $$\begin{align}
 
 Here $\mathbf{Q} \in \mathbb{R}^{n \times n}$ and $\mathbf{q}\in \mathbb{R}^{n}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Equality constraints are represented by matrix $\mathbf{A}\in \mathbb{R}^{m \times n}$ and vector $\mathbf{b}\in \mathbb{R}^m$, inequality constraints by matrix $\mathbf{G} \in \mathbb{R}^{p \times n}$ and vector $\mathbf{h}\in \mathbb{R}^p$. (This notation also is used throughout the code, and is conform with the notation used in the tutorial linked above.)
 
-## Usage
+## Usage 
 Defining a QP is fairly simple. Matrices can be built according to the documentation of the Basic Linear Algebra library linked above:
 ```cpp
 // QP dimensions
@@ -60,4 +60,36 @@ primal value (solution): [[1.00],[0.00]]
 dual value (equalities): [[1.00],[-2.00]]
 dual value (inequalities): [[0.00]]
 ```
+
+For creating an unconstrained QP, the dimensions of the nonexistent matrices are set to zero, and an empty matrix is passed to the constructor:
+```cpp
+// QP dimensions
+const int n = 2;
+const int m = 0;
+const int p = 0;
+
+// quadratic objective
+Matrix<n,n> Q = {1, 0, 0, 1};
+Matrix<n,1> q = {1, -1};
+// build and update the quadratic program 
+QP<nx,m,p> qp; 
+qp.update(Q,q,{},{},{},{});      
+```
+
+## Infeasibility detection and handling 
+The solver will verify stationarity along with primal and dual feasibility when solving a constrained QP.
+If the QP is unconstraint, only stationarity is considered. In case the solver fails to converge, or feasibility is not achieved, the primal solution and objective in the returned solution object will be set to NaN. In verbose mode, this will be visible in the solver's status report.
+
+```bash
+status: status: primal infeasible
+optimal optimal objective: nan
+primal primal value (solution): [[nan],[nan]]
+...
+```
+
+
+
+
+
+
 
