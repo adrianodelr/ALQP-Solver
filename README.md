@@ -20,17 +20,17 @@ Defining a QP is fairly simple. Matrices can be built according to the documenta
 // QP dimensions
 const int n = 2;
 const int m = 2;
-const int p = 2;
+const int p = 1;
 
 // quadratic objective
-Matrix<n,n> Q = {2, 0, 2, 0};
-Matrix<n,1> q = {-4, -6};
+Matrix<n,n> Q = {1, 0, 0, 1};
+Matrix<n,1> q = {1, -1};
 // equality constraints 
-Matrix<m ,n> A = {1, 1, 0.3, -1};
-Matrix<m ,1> b = {3, 1};
+Matrix<m ,n> A = {0,1,1,0};
+Matrix<m ,1> b = {0,1};
 // inequality constraints  
-Matrix<p ,n> G = {-1, 1, 0, -1};
-Matrix<p ,1> h = {1, 1};
+Matrix<p ,n> G = {0.5,0};
+Matrix<p ,1> h = {0.5};
 ```
 The QP is built as follows and can updated sequentially at runtime, as e.g. required by a model predictive controller:  
 
@@ -55,9 +55,9 @@ auto sol = qp.solve("verbose");
 This will result in following output printed to the console. In case of primal or dual feasibility the status changes accordingly.  
 ```bash
 status: solved
-optimal objective: -2.62
-primal value (solution): [[3.08],[-0.08]]
-dual value (equalities): [[-1.69],[-1.54]]
-dual value (inequalities): [[0.00],[0.00]]
+optimal objective: 1.50
+primal value (solution): [[1.00],[0.00]]
+dual value (equalities): [[1.00],[-2.00]]
+dual value (inequalities): [[0.00]]
 ```
 
