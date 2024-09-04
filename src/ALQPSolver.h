@@ -1,5 +1,4 @@
-#ifndef ALQPS_H
-#define ALQPS_H
+#pragma once
 
 #include <Arduino.h>
 #include <BasicLinearAlgebra.h>
@@ -77,13 +76,13 @@ class QP{
             update(Q, q, A, b, G, h);
 
             // fixed solver settings 
-            max_iter_newton = 25;
-            max_iter_outer  = 25;
+            _max_iter_newton = 25;
+            _max_iter_outer  = 25;
 
-            precision_newton = 1e-6;
-            penalty_initial  = 1.00;
-            penalty_scaling  = 10.0;
-            precision_primal = 1e-6;
+            _precision_newton = 1e-6;
+            _penalty_initial  = 1.00;
+            _penalty_scaling  = 10.0;
+            _precision_primal = 1e-6;
         }; 
 
         // solving the qp
@@ -99,14 +98,14 @@ class QP{
             lambda.Fill(0);
             mu.Fill(0);
 
-            double rho = penalty_initial;
-            double Phi = penalty_scaling;
+            double rho = _penalty_initial;
+            double Phi = _penalty_scaling;
 
             Matrix<1,1> innerprod;
             Matrix<m+p> rp;
             double normrp;
 
-            for (int i = 0; i < max_iter_outer; i++){
+            for (int i = 0; i < _max_iter_outer; i++){
                 x = newton_solve(x, lambda, mu, rho, verb);
                 if (isnan(x(0))){
                     // condition for rank deficient AL Hessian                     
@@ -119,7 +118,7 @@ class QP{
                     Matrix<nx,1> Nabla_x_L = stationarity(x, lambda, mu); 
                     innerprod = ~Nabla_x_L * Nabla_x_L;
                     double normg = sqrt(innerprod(0));                    
-                    if (normg < precision_newton){
+                    if (normg < _precision_newton){
                         QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);
                         return sol;
                     }
@@ -134,16 +133,18 @@ class QP{
                 normrp = sqrt(innerprod(0));
                 
                 // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
-                if (normrp < precision_primal && dual_feasibility(mu)){
+                if (normrp < _precision_primal && dual_feasibility(mu)){
                     QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);                    
                     return sol;
                 }
             }
             x.Fill(0.0/0.0);
-            if (normrp > precision_primal){
+            // primal infeasible
+            if (normrp > _precision_primal){
                 QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,true,false,false,verb);
                 return sol;                     
             }
+            // dual infeasible 
             else if (!dual_feasibility(mu)){
                 QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,false,true,false,verb);
                 return sol;
@@ -160,13 +161,13 @@ class QP{
         Matrix<p ,1>  _h;           // inequality constraint vector 
         
         // Solver settings
-        size_t max_iter_newton;
-        size_t max_iter_outer;
+        size_t _max_iter_newton;      
+        size_t _max_iter_outer;
 
-        double precision_newton;
-        double penalty_initial;
-        double penalty_scaling;
-        double precision_primal;
+        double _precision_newton;
+        double _penalty_initial;
+        double _penalty_scaling;
+        double _precision_primal;
 
         // returns left hand side of the equality constraints   
         Matrix<m,1> c_eq(Matrix<nx,1> x){
@@ -180,18 +181,18 @@ class QP{
         float objective(Matrix<nx,1> x){
             return 0.5*(~x*_Q*x)(0) + (~_q*x)(0);             
         };
-
+        // gradient of Lagrangian 
         Matrix<nx,1> stationarity(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
-            Matrix<nx,1> g = _Q*x + _q; 
+            Matrix<nx,1> Nabla_x_L = _Q*x + _q; 
             if (m != 0) {
-                g += ~_A*lambda;
+                Nabla_x_L += ~_A*lambda;
             }
             if (p != 0){
-                g += ~_G*mu;
+                Nabla_x_L += ~_G*mu;
             }
-            return g;
+            return Nabla_x_L;
         }; 
-
+        // measures how much constraint violation
         Matrix<m+p,1>  primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
             Matrix<m,1> c = c_eq(x);
             Matrix<p,1> h = c_in(x);
@@ -200,7 +201,7 @@ class QP{
             }
             return c && h;
         };
-
+        // dual problem requires non negative duals 
         bool dual_feasibility(Matrix<p,1> mu){
             for (int i = 0; i < p; i++){
                 if(mu(i) < 0.0) return false;
@@ -218,7 +219,7 @@ class QP{
                 lambda(i) = lambda(i)+rho*h(i);
             }  
         };
-        
+        // matrix indicating active inequalites 
         Matrix<p,p> active_set(Matrix<nx,1> x, Matrix<p,1> mu, float rho){
             Matrix<p,p> Ip;
             Ip.Fill(0);
@@ -233,7 +234,7 @@ class QP{
             }
             return Ip;           
         };
-
+        // gradient of augmented Lagrangian 
         Matrix<nx, 1> algradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, float rho){
             Matrix<nx> Nabla_x_L = stationarity(x, lambda, mu);
             if (m+p == 0){
@@ -253,7 +254,7 @@ class QP{
             }
             // Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu); 
         };
-
+        // Hessian of augmented Lagrangian 
         Matrix<nx,nx> alhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho){
             Matrix<nx,nx> Nabla_xx_L = _Q;
             if (m+p == 0){
@@ -272,16 +273,16 @@ class QP{
                 return Nabla_xx_L+Nabla_xx_g;
             }
         };
-
+        // 'Inner' newton solver 
         Matrix<nx, 1> newton_solve(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho, bool verb){
             Matrix<nx,1> x_sol = x;
-            for (int i = 0; i < max_iter_newton; i++){
+            for (int i = 0; i < _max_iter_newton; i++){
                 
                 Matrix<nx,1> g = algradient(x_sol, lambda, mu, rho);
                 Matrix<1,1> innerprod = ~g * g;
                 double normg = sqrt(innerprod(0));
                 
-                if (normg < precision_newton){
+                if (normg < _precision_newton){
                     return x_sol;
                 }
 
@@ -299,5 +300,3 @@ class QP{
         };
     };
 }; // namespace ALQPS
-
-#endif // ALQPS_H
