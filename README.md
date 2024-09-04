@@ -77,7 +77,7 @@ qp.update(Q,q,{},{},{},{});
 ```
 
 ### Infeasibility detection and handling 
-The solver will check for stationarity, as well as primal and dual feasibility, when solving a constrained QP. If the QP is unconstrained, only stationarity is considered. In case the solver fails to converge, or feasibility is not achieved, the primal solution and objective in the returned solution object will be set to NaN. In verbose mode, this will be visible in the solver's status report.
+The solver will check for stationarity, as well as primal and dual feasibility, when solving a constrained QP. If the QP is unconstrained, only stationarity is considered. In case the solver fails to converge, or feasibility is not achieved, the primal solution and objective in the returned solution object will be set to NaN (easily detected with `isnan()`). In verbose mode, this will be also visible in the solver's status report.
 
 ```bash
 status: status: primal infeasible
