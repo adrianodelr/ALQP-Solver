@@ -32,7 +32,7 @@ Matrix<m ,1> b = {0,1};
 Matrix<p ,n> G = {0.5,0};
 Matrix<p ,1> h = {0.5};
 ```
-The QP is built as follows and can updated sequentially at runtime, as e.g. required by a model predictive controller:  
+The QP is built as follows and can be updated sequentially at runtime, as e.g. required by a model predictive controller:  
 
 ```cpp
 // build and update the quadratic program 
@@ -82,7 +82,7 @@ The solver will check for stationarity, as well as primal and dual feasibility, 
 ```bash
 status: status: primal infeasible
 optimal optimal objective: nan
-primal primal value (solution): [[nan],[nan]]
+primal value (solution): [[nan],[nan]]
 ...
 ```
 
