@@ -15,7 +15,7 @@ class QPsol{
             if (verbose) print_report();
         }; 
 
-        // primal and dual variables (dropping of private/public member notation "_var" for making things more userfriendly)
+        // primal and dual variables 
         Matrix<nx,1> x;
         Matrix<m ,1> lambda;                        
         Matrix<p ,1> mu;
@@ -62,7 +62,6 @@ class QP{
         }; 
         // Default constructor for empty qp
         QP(){
-            // TODO: handle unconstrained problem properly
             Matrix<nx,nx> Q;
             Matrix<nx,1>  q;
             Matrix<m ,nx> A;
@@ -88,7 +87,7 @@ class QP{
         }; 
 
         // solving the qp
-        QPsol<nx,m,p> solve(String mode = "nonverbose"){
+        QPsol<nx,m,p> solve(String mode = ""){
             
             bool verb = false;
             if (mode=="verbose") verb=true;
