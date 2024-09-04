@@ -103,29 +103,37 @@ class QP{
             double rho = penalty_initial;
             double Phi = penalty_scaling;
 
-            Matrix<m+p> rp;
             Matrix<1,1> innerprod;
+            Matrix<m+p> rp;
             double normrp;
 
             for (int i = 0; i < max_iter_outer; i++){
                 x = newton_solve(x, lambda, mu, rho, verb);
                 if (isnan(x(0))){
+                    // condition for rank deficient AL Hessian                     
                     QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,false,false,true,verb);
                     return sol;
                 }                
                 if (m+p == 0){
-                    QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);
-                    return sol;
+                    // reconsider if stationarity condition is satisfied to determine if x is truly the unconstrained optimum                                            
+                    // otherwise re enter newton solver in next iteration 
+                    Matrix<nx,1> Nabla_x_L = stationarity(x, lambda, mu); 
+                    innerprod = ~Nabla_x_L * Nabla_x_L;
+                    double normg = sqrt(innerprod(0));                    
+                    if (normg < precision_newton){
+                        QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);
+                        return sol;
+                    }
                 } 
                                 
                 // update dual variables lambda, mu
                 dual_update(x, lambda, mu, rho); 
                 rho = Phi*rho;
-
+                
                 rp = primal_residual(x, lambda, mu);
                 innerprod = ~rp * rp;
                 normrp = sqrt(innerprod(0));
-
+                
                 // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
                 if (normrp < precision_primal && dual_feasibility(mu)){
                     QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);                    
@@ -175,14 +183,14 @@ class QP{
         };
 
         Matrix<nx,1> stationarity(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
-            Matrix<nx,1> pr = _Q*x + _q; 
+            Matrix<nx,1> g = _Q*x + _q; 
             if (m != 0) {
-                pr += ~_A*lambda;
+                g += ~_A*lambda;
             }
             if (p != 0){
-                pr += ~_G*mu;
+                g += ~_G*mu;
             }
-            return pr;
+            return g;
         }; 
 
         Matrix<m+p,1>  primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
@@ -229,11 +237,6 @@ class QP{
 
         Matrix<nx, 1> algradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, float rho){
             Matrix<nx> Nabla_x_L = stationarity(x, lambda, mu);
-            // Matrix<p,p> Ip = active_set(x, mu, rho);
-            // Matrix<nx> Nabla_x_g; 
-            // Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu);
-            // return Nabla_x_L+Nabla_x_g;            
-            // TODO check wether (~_G*Ip) should be multiplied with inequalities directly or first max(h(i), 0) is applied ? probably not important as inactive
             if (m+p == 0){
                 return Nabla_x_L;
             }
@@ -248,7 +251,8 @@ class QP{
                     Nabla_x_g += (~_G*Ip) * c_in(x);
                 }
                 return Nabla_x_L+Nabla_x_g;
-            }            
+            }
+            // Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu); 
         };
 
         Matrix<nx,nx> alhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho){
@@ -273,7 +277,7 @@ class QP{
         Matrix<nx, 1> newton_solve(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho, bool verb){
             Matrix<nx,1> x_sol = x;
             for (int i = 0; i < max_iter_newton; i++){
-
+                
                 Matrix<nx,1> g = algradient(x_sol, lambda, mu, rho);
                 Matrix<1,1> innerprod = ~g * g;
                 double normg = sqrt(innerprod(0));
