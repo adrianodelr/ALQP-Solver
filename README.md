@@ -52,7 +52,7 @@ It is also possible to print a solver status report by setting a  default argume
 // solve QP 
 auto sol = qp.solve("verbose"); 
 ```
-This will result in following output printed to the console. In case of primal or dual feasibility the status changes accordingly.  
+This will result in following output printed to the console. In case of primal or dual infeasibility the status changes accordingly.  
 ```bash
 status: solved
 optimal objective: 1.50
@@ -61,7 +61,7 @@ dual value (equalities): [[1.00],[-2.00]]
 dual value (inequalities): [[0.00]]
 ```
 
-For creating an unconstrained QP, the dimensions of the nonexistent matrices are set to zero, and an empty matrix is passed to the constructor:
+For creating an unconstrained QP, the dimensions of the nonexistent matrices are set to zero, and an empty matrix is passed to the update function:
 ```cpp
 // QP dimensions
 const int n = 2;
