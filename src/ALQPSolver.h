@@ -26,13 +26,28 @@ public:
     float penalty_scaling;
 };
 
+// status indicating solver success or infeasibility
+struct SolverStatus{
+    bool solved = false; 
+    bool pinf = false; 
+    bool dinf = false;
+    bool degh = false;
+};
 
-
+// solution class 
 template<int nx, int m, int p>
 class QPsol{
     public:
-        QPsol(Matrix<nx,1> x_, Matrix<m,1> lambda_, Matrix<p,1> mu_, float obj_val_, bool solved, bool pinf, bool dinf, bool degh, bool verbose) 
-            : x(x_), lambda(lambda_), mu(mu_), obj_val(obj_val_), _solved(solved), _pinf(pinf), _dinf(dinf), _degh(degh) {
+        QPsol(Matrix<nx,1> x_, Matrix<m,1> lambda_, Matrix<p,1> mu_, 
+              float obj_val_, SolverStatus status, bool verbose) 
+            : x(x_), 
+              lambda(lambda_), 
+              mu(mu_), 
+              obj_val(obj_val_), 
+              _solved(status.solved), 
+              _pinf(status.pinf), 
+              _dinf(status.dinf), 
+              _degh(status.degh) {
             if (verbose) print_report();
         }; 
 
@@ -40,6 +55,7 @@ class QPsol{
         Matrix<nx,1> x;
         Matrix<m ,1> lambda;                        
         Matrix<p ,1> mu;
+
         // objective value and status variables   
         const float obj_val;         
         const bool _solved;
@@ -57,13 +73,10 @@ class QPsol{
 
             Serial.print("optimal objective: ");
             Serial.println(obj_val);
-
             Serial.print("primal value (solution): ");
             Serial.println(x);
-
             Serial.print("dual value (equalities): ");
             Serial.println(lambda);
-
             Serial.print("dual value (inequalities): ");
             Serial.println(mu);
         }          
@@ -73,51 +86,25 @@ template<int nx, int m, int p>
 class QP{
     public:
         // updates the qp
-        void update(Matrix<nx,nx> Q, Matrix<nx,1> q, Matrix<m,nx> A, Matrix<m,1> b, Matrix<p,nx> G, Matrix<p,1> h){
-            _Q=Q;
-            _q=q;
-            _A=A;
-            _b=b;                        
-            _G=G;
-            _h=h;            
+        void update(const Matrix<nx,nx>& Q, const Matrix<nx,1>& q, 
+                    const Matrix<m, nx>& A, const Matrix<m, 1>& b, 
+                    const Matrix<p, nx>& G, const Matrix<p, 1>& h){
+            _Q = Q;
+            _q = q;
+            _A = A;
+            _b = b;                        
+            _G = G;
+            _h = h;            
         }; 
         // Default constructor for empty qp
         QP() 
             : _params(new QPparams()), _alloc(true) {            
-            Matrix<nx,nx> Q;
-            Matrix<nx,1>  q;
-            Matrix<m ,nx> A;
-            Matrix<m ,1>  b;                        
-            Matrix<p ,nx> G;
-            Matrix<p ,1>  h; 
-
-            Q.Fill(0.);
-            q.Fill(0.);
-            A.Fill(0.);
-            b.Fill(0.);            
-            G.Fill(0.);           
-            h.Fill(0.);
-
-            update(Q, q, A, b, G, h);
+            init_QPmat();
         }; 
 
         QP(const QPparams& parameters) 
             : _params(&parameters), _alloc(false){
-            Matrix<nx,nx> Q;
-            Matrix<nx,1>  q;
-            Matrix<m ,nx> A;
-            Matrix<m ,1>  b;                        
-            Matrix<p ,nx> G;
-            Matrix<p ,1>  h; 
-
-            Q.Fill(0.);
-            q.Fill(0.);
-            A.Fill(0.);
-            b.Fill(0.);            
-            G.Fill(0.);           
-            h.Fill(0.);            
-
-            update(Q, q, A, b, G, h);
+            init_QPmat();
         }
 
         // destructor in case of taking default parameters 
@@ -146,12 +133,16 @@ class QP{
             Matrix<m+p> rp;
             double normrp;
 
+            double obj_val; 
+            SolverStatus status;
+
             for (int i = 0; i < _params -> max_iter_outer; i++){
                 x = newton_solve(x, lambda, mu, rho, verb);
                 if (isnan(x(0))){
-                    // condition for rank deficient AL Hessian                     
-                    QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,false,false,true,verb);
-                    return sol;
+                    // condition for rank deficient AL Hessian
+                    status.degh = true;
+                    obj_val = 0.0/0.0;
+                    break;
                 }                
                 if (m+p == 0){
                     // reconsider if stationarity condition is satisfied to determine if x is truly the unconstrained optimum                                            
@@ -160,8 +151,9 @@ class QP{
                     innerprod = ~Nabla_x_L * Nabla_x_L;
                     double normg = sqrt(innerprod(0));                    
                     if (normg < _params -> precision_newton){
-                        QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);
-                        return sol;
+                        obj_val = objective(x);
+                        status.solved = true; 
+                        break;
                     }
                 } 
                                 
@@ -175,21 +167,25 @@ class QP{
                 
                 // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
                 if (normrp <  _params -> precision_primal && dual_feasibility(mu)){
-                    QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);                    
-                    return sol;
+                    obj_val = objective(x);
+                    status.solved = true;
+                    break; 
                 }
             }
-            x.Fill(0.0/0.0);
             // primal infeasible
             if (normrp > _params -> precision_primal){
-                QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,true,false,false,verb);
-                return sol;                     
+                status.pinf = true;
+                obj_val = 0.0/0.0; 
+                x.Fill(0.0/0.0);
             }
             // dual infeasible 
             else if (!dual_feasibility(mu)){
-                QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,false,true,false,verb);
-                return sol;
+                status.dinf = true;
+                obj_val = 0.0/0.0;
+                x.Fill(0.0/0.0);
             }
+            QPsol<nx,m,p> sol(x,lambda,mu,obj_val,status,verb);
+            return sol;            
         };
 
     private: 
@@ -204,6 +200,23 @@ class QP{
         // Solver settings
         const QPparams* _params;
         bool _alloc; 
+        
+        // initializes all matrices of given dimensions with zeros 
+        void init_QPmat(){
+            Matrix<nx,nx> Q;
+            Matrix<nx,1>  q;
+            Matrix<m ,nx> A;
+            Matrix<m ,1>  b;                        
+            Matrix<p ,nx> G;
+            Matrix<p ,1>  h; 
+            Q.Fill(0.);
+            q.Fill(0.);
+            A.Fill(0.);
+            b.Fill(0.);            
+            G.Fill(0.);           
+            h.Fill(0.);
+            update(Q, q, A, b, G, h);
+        }
 
         // returns left hand side of the equality constraints   
         Matrix<m,1> c_eq(Matrix<nx,1> x){
