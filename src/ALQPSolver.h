@@ -7,10 +7,32 @@ using namespace BLA;
 
 namespace ALQPS {
 
+// parameter setting for solver 
+class QPparams {
+public:
+    QPparams()
+        : max_iter_newton(25),
+          max_iter_outer(25),
+          precision_newton(1e-6),
+          precision_primal(1e-6),
+          penalty_initial(1.0),
+          penalty_scaling(10.0) {}  // Default values
+
+    size_t max_iter_newton;
+    size_t max_iter_outer;
+    float precision_newton;
+    float precision_primal;
+    float penalty_initial;
+    float penalty_scaling;
+};
+
+
+
 template<int nx, int m, int p>
 class QPsol{
     public:
-        QPsol(Matrix<nx,1> x_, Matrix<m,1> lambda_, Matrix<p,1> mu_, float obj_val_, bool solved, bool pinf, bool dinf, bool degh, bool verbose) : x(x_), lambda(lambda_), mu(mu_), obj_val(obj_val_), _solved(solved), _pinf(pinf), _dinf(dinf), _degh(degh) {
+        QPsol(Matrix<nx,1> x_, Matrix<m,1> lambda_, Matrix<p,1> mu_, float obj_val_, bool solved, bool pinf, bool dinf, bool degh, bool verbose) 
+            : x(x_), lambda(lambda_), mu(mu_), obj_val(obj_val_), _solved(solved), _pinf(pinf), _dinf(dinf), _degh(degh) {
             if (verbose) print_report();
         }; 
 
@@ -60,30 +82,48 @@ class QP{
             _h=h;            
         }; 
         // Default constructor for empty qp
-        QP(){
+        QP() 
+            : _params(new QPparams()), _alloc(true) {            
             Matrix<nx,nx> Q;
             Matrix<nx,1>  q;
             Matrix<m ,nx> A;
             Matrix<m ,1>  b;                        
             Matrix<p ,nx> G;
-            Matrix<p ,1>  h;   
+            Matrix<p ,1>  h; 
+
             Q.Fill(0.);
             q.Fill(0.);
             A.Fill(0.);
             b.Fill(0.);            
             G.Fill(0.);           
             h.Fill(0.);
+
             update(Q, q, A, b, G, h);
-
-            // fixed solver settings 
-            _max_iter_newton = 25;
-            _max_iter_outer  = 25;
-
-            _precision_newton = 1e-6;
-            _penalty_initial  = 1.00;
-            _penalty_scaling  = 10.0;
-            _precision_primal = 1e-6;
         }; 
+
+        QP(const QPparams& parameters) 
+            : _params(&parameters), _alloc(false){
+            Matrix<nx,nx> Q;
+            Matrix<nx,1>  q;
+            Matrix<m ,nx> A;
+            Matrix<m ,1>  b;                        
+            Matrix<p ,nx> G;
+            Matrix<p ,1>  h; 
+
+            Q.Fill(0.);
+            q.Fill(0.);
+            A.Fill(0.);
+            b.Fill(0.);            
+            G.Fill(0.);           
+            h.Fill(0.);            
+
+            update(Q, q, A, b, G, h);
+        }
+
+        // destructor in case of taking default parameters 
+        ~QP(){
+            if(_alloc) delete _params;
+        }
 
         // solving the qp
         QPsol<nx,m,p> solve(String mode = ""){
@@ -94,18 +134,19 @@ class QP{
             Matrix<nx,1> x;
             Matrix<m ,1> lambda;
             Matrix<p ,1> mu;     
+
             x.Fill(0);
             lambda.Fill(0);
             mu.Fill(0);
 
-            double rho = _penalty_initial;
-            double Phi = _penalty_scaling;
+            double rho = _params -> penalty_initial;
+            double Phi = _params -> penalty_scaling;
 
             Matrix<1,1> innerprod;
             Matrix<m+p> rp;
             double normrp;
 
-            for (int i = 0; i < _max_iter_outer; i++){
+            for (int i = 0; i < _params -> max_iter_outer; i++){
                 x = newton_solve(x, lambda, mu, rho, verb);
                 if (isnan(x(0))){
                     // condition for rank deficient AL Hessian                     
@@ -118,7 +159,7 @@ class QP{
                     Matrix<nx,1> Nabla_x_L = stationarity(x, lambda, mu); 
                     innerprod = ~Nabla_x_L * Nabla_x_L;
                     double normg = sqrt(innerprod(0));                    
-                    if (normg < _precision_newton){
+                    if (normg < _params -> precision_newton){
                         QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);
                         return sol;
                     }
@@ -133,14 +174,14 @@ class QP{
                 normrp = sqrt(innerprod(0));
                 
                 // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
-                if (normrp < _precision_primal && dual_feasibility(mu)){
+                if (normrp <  _params -> precision_primal && dual_feasibility(mu)){
                     QPsol<nx,m,p> sol(x,lambda,mu,objective(x),true,false,false,false,verb);                    
                     return sol;
                 }
             }
             x.Fill(0.0/0.0);
             // primal infeasible
-            if (normrp > _precision_primal){
+            if (normrp > _params -> precision_primal){
                 QPsol<nx,m,p> sol(x,lambda,mu,0.0/0.0,false,true,false,false,verb);
                 return sol;                     
             }
@@ -161,13 +202,8 @@ class QP{
         Matrix<p ,1>  _h;           // inequality constraint vector 
         
         // Solver settings
-        size_t _max_iter_newton;      
-        size_t _max_iter_outer;
-
-        double _precision_newton;
-        double _penalty_initial;
-        double _penalty_scaling;
-        double _precision_primal;
+        const QPparams* _params;
+        bool _alloc; 
 
         // returns left hand side of the equality constraints   
         Matrix<m,1> c_eq(Matrix<nx,1> x){
@@ -276,13 +312,13 @@ class QP{
         // 'Inner' newton solver 
         Matrix<nx, 1> newton_solve(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho, bool verb){
             Matrix<nx,1> x_sol = x;
-            for (int i = 0; i < _max_iter_newton; i++){
+            for (int i = 0; i < _params -> max_iter_newton; i++){
                 
                 Matrix<nx,1> g = algradient(x_sol, lambda, mu, rho);
                 Matrix<1,1> innerprod = ~g * g;
                 double normg = sqrt(innerprod(0));
                 
-                if (normg < _precision_newton){
+                if (normg < _params -> precision_newton){
                     return x_sol;
                 }
 
