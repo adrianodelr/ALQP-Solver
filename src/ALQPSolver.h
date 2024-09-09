@@ -220,7 +220,7 @@ class QP{
             }  
         };
         // matrix indicating active inequalites 
-        Matrix<p,p> active_set(Matrix<nx,1> x, Matrix<p,1> mu, float rho){
+        Matrix<p,p> active_ineq(Matrix<nx,1> x, Matrix<p,1> mu, float rho){
             Matrix<p,p> Ip;
             Ip.Fill(0);
             Matrix<p,1> h = c_in(x);
@@ -247,7 +247,7 @@ class QP{
                     Nabla_x_g += (~_A*rho) * c_eq(x);    
                 }
                 if(p != 0){
-                    Matrix<p,p> Ip = active_set(x, mu, rho);
+                    Matrix<p,p> Ip = active_ineq(x, mu, rho);
                     Nabla_x_g += (~_G*Ip) * c_in(x);
                 }
                 return Nabla_x_L+Nabla_x_g;
@@ -267,7 +267,7 @@ class QP{
                     Nabla_xx_g += (~_A*rho) * (_A);    
                 }
                 if(p != 0){
-                    Matrix<p,p> Ip = active_set(x, mu, rho);
+                    Matrix<p,p> Ip = active_ineq(x, mu, rho);
                     Nabla_xx_g += (~_G*Ip) * (_G);
                 }
                 return Nabla_xx_L+Nabla_xx_g;
