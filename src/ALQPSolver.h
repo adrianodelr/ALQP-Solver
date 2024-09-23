@@ -20,10 +20,10 @@ public:
 
     size_t max_iter_newton;
     size_t max_iter_outer;
-    float precision_newton;
-    float precision_primal;
-    float penalty_initial;
-    float penalty_scaling;
+    double precision_newton;
+    double precision_primal;
+    double penalty_initial;
+    double penalty_scaling;
 };
 
 // status indicating solver success or infeasibility
@@ -35,10 +35,10 @@ struct SolverStatus{
 };
 
 // solution class 
-template<int nx, int m, int p>
+template<int nx, int m, int p, typename DType = float>
 class QPsol{
     public:
-        QPsol(Matrix<nx,1> x_, Matrix<m,1> lambda_, Matrix<p,1> mu_, 
+        QPsol(Matrix<nx,1,DType> x_, Matrix<m,1,DType> lambda_, Matrix<p,1,DType> mu_, 
               float obj_val_, SolverStatus status, bool verbose) 
             : x(x_), 
               lambda(lambda_), 
@@ -52,12 +52,12 @@ class QPsol{
         }; 
 
         // primal and dual variables 
-        Matrix<nx,1> x;
-        Matrix<m ,1> lambda;                        
-        Matrix<p ,1> mu;
+        Matrix<nx,1,DType> x;
+        Matrix<m ,1,DType> lambda;                        
+        Matrix<p ,1,DType> mu;
 
         // objective value and status variables   
-        const float obj_val;         
+        const DType obj_val;         
         const bool _solved;
         const bool _pinf;
         const bool _dinf;
@@ -82,13 +82,13 @@ class QPsol{
         }          
 };
 
-template<int nx, int m, int p>
+template<int nx, int m, int p, typename DType=float>
 class QP{
     public:
         // updates the qp
-        void update(const Matrix<nx,nx>& Q, const Matrix<nx,1>& q, 
-                    const Matrix<m, nx>& A, const Matrix<m, 1>& b, 
-                    const Matrix<p, nx>& G, const Matrix<p, 1>& h){
+        void update(const Matrix<nx,nx, DType>& Q, const Matrix<nx,1,DType>& q, 
+                    const Matrix<m, nx, DType>& A, const Matrix<m, 1,DType>& b, 
+                    const Matrix<p, nx, DType>& G, const Matrix<p, 1,DType>& h){
             _Q = Q;
             _q = q;
             _A = A;
@@ -113,27 +113,29 @@ class QP{
         }
 
         // solving the qp
-        QPsol<nx,m,p> solve(String mode = ""){
+        QPsol<nx,m,p,DType> solve(String mode = ""){
+            
+            Serial.println("im solving");
             
             bool verb = false;
             if (mode=="verbose") verb=true;
 
-            Matrix<nx,1> x;
-            Matrix<m ,1> lambda;
-            Matrix<p ,1> mu;     
+            Matrix<nx,1,DType> x;
+            Matrix<m ,1,DType> lambda;
+            Matrix<p ,1,DType> mu;     
 
-            x.Fill(0);
-            lambda.Fill(0);
-            mu.Fill(0);
+            x.Fill(static_cast<DType>(0.0));
+            lambda.Fill(static_cast<DType>(0.0));
+            mu.Fill(static_cast<DType>(0.0));
 
-            double rho = _params -> penalty_initial;
-            double Phi = _params -> penalty_scaling;
+            DType rho = _params -> penalty_initial;
+            DType Phi = _params -> penalty_scaling;
 
-            Matrix<1,1> innerprod;
-            Matrix<m+p> rp;
-            double normrp;
+            Matrix<1,1,DType> innerprod;
+            Matrix<m+p,1,DType> rp;
+            DType normrp;
 
-            double obj_val; 
+            DType obj_val; 
             SolverStatus status;
 
             for (int i = 0; i < _params -> max_iter_outer; i++){
@@ -147,9 +149,9 @@ class QP{
                 if (m+p == 0){
                     // reconsider if stationarity condition is satisfied to determine if x is truly the unconstrained optimum                                            
                     // otherwise re enter newton solver in next iteration 
-                    Matrix<nx,1> Nabla_x_L = stationarity(x, lambda, mu); 
+                    Matrix<nx,1,DType> Nabla_x_L = stationarity(x, lambda, mu); 
                     innerprod = ~Nabla_x_L * Nabla_x_L;
-                    double normg = sqrt(innerprod(0));                    
+                    DType normg = sqrt(innerprod(0));                    
                     if (normg < _params -> precision_newton){
                         obj_val = objective(x);
                         status.solved = true; 
@@ -184,18 +186,18 @@ class QP{
                 obj_val = 0.0/0.0;
                 x.Fill(0.0/0.0);
             }
-            QPsol<nx,m,p> sol(x,lambda,mu,obj_val,status,verb);
+            QPsol<nx,m,p,DType> sol(x,lambda,mu,obj_val,status,verb);
             return sol;            
         };
 
     private: 
         // QP matrices 
-        Matrix<nx,nx> _Q;           // quadratic coefficient matrix  
-        Matrix<nx,1>  _q;           // linear coefficient vector 
-        Matrix<m ,nx> _A;           // equality constraint matrix 
-        Matrix<m ,1>  _b;           // equality constraint vector 
-        Matrix<p ,nx> _G;           // inequality constraint matrix 
-        Matrix<p ,1>  _h;           // inequality constraint vector 
+        Matrix<nx,nx, DType> _Q;           // quadratic coefficient matrix  
+        Matrix<nx, 1, DType>  _q;           // linear coefficient vector 
+        Matrix<m, nx, DType> _A;           // equality constraint matrix 
+        Matrix<m,  1, DType> _b;           // equality constraint vector 
+        Matrix<p, nx, DType> _G;           // inequality constraint matrix 
+        Matrix<p,  1, DType> _h;           // inequality constraint vector 
         
         // Solver settings
         const QPparams* _params;
@@ -203,36 +205,36 @@ class QP{
         
         // initializes all matrices of given dimensions with zeros 
         void init_QPmat(){
-            Matrix<nx,nx> Q;
-            Matrix<nx,1>  q;
-            Matrix<m ,nx> A;
-            Matrix<m ,1>  b;                        
-            Matrix<p ,nx> G;
-            Matrix<p ,1>  h; 
-            Q.Fill(0.);
-            q.Fill(0.);
-            A.Fill(0.);
-            b.Fill(0.);            
-            G.Fill(0.);           
-            h.Fill(0.);
+            Matrix<nx,nx, DType> Q;
+            Matrix<nx, 1, DType>  q;
+            Matrix<m, nx, DType> A;
+            Matrix<m,  1, DType>  b;                        
+            Matrix<p, nx, DType> G;
+            Matrix<p,  1, DType>  h; 
+            Q.Fill(static_cast<DType>(0.0));
+            q.Fill(static_cast<DType>(0.0));
+            A.Fill(static_cast<DType>(0.0));
+            b.Fill(static_cast<DType>(0.0));            
+            G.Fill(static_cast<DType>(0.0));           
+            h.Fill(static_cast<DType>(0.0));
             update(Q, q, A, b, G, h);
         }
 
         // returns left hand side of the equality constraints   
-        Matrix<m,1> c_eq(Matrix<nx,1> x){
+        Matrix<m,1, DType> c_eq(Matrix<nx,1,DType> x){
             return _A*x - _b; 
         };
         // returns left hand side of the inequality constraints   
-        Matrix<p,1> c_in(Matrix<nx,1> x){
+        Matrix<p,1, DType> c_in(Matrix<nx,1,DType> x){
             return _G*x - _h; 
         };
         // computes the objective value 
-        float objective(Matrix<nx,1> x){
+        float objective(Matrix<nx,1,DType> x){
             return 0.5*(~x*_Q*x)(0) + (~_q*x)(0);             
         };
         // gradient of Lagrangian 
-        Matrix<nx,1> stationarity(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
-            Matrix<nx,1> Nabla_x_L = _Q*x + _q; 
+        Matrix<nx,1,DType> stationarity(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu){
+            Matrix<nx,1,DType> Nabla_x_L = _Q*x + _q; 
             if (m != 0) {
                 Nabla_x_L += ~_A*lambda;
             }
@@ -242,40 +244,40 @@ class QP{
             return Nabla_x_L;
         }; 
         // measures how much constraint violation
-        Matrix<m+p,1>  primal_residual(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu){
-            Matrix<m,1> c = c_eq(x);
-            Matrix<p,1> h = c_in(x);
+        Matrix<m+p,1,DType>  primal_residual(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu){
+            Matrix<m,1,DType> c = c_eq(x);
+            Matrix<p,1,DType> h = c_in(x);
             for (int i = 0; i < p; i++){
-                h(i) = max(h(i), 0);
+                h(i) = max(h(i), static_cast<DType>(0));
             }
             return c && h;
         };
         // dual problem requires non negative duals 
-        bool dual_feasibility(Matrix<p,1> mu){
+        bool dual_feasibility(Matrix<p,1,DType> mu){
             for (int i = 0; i < p; i++){
                 if(mu(i) < 0.0) return false;
             }
             return true;  
         }
 
-        void dual_update(Matrix<nx,1> x, Matrix<m,1> &lambda, Matrix<p> &mu, float rho){
-            Matrix<p,1> c = c_in(x);
-            Matrix<m,1> h = c_eq(x);
+        void dual_update(Matrix<nx,1,DType> x, Matrix<m,1,DType> &lambda, Matrix<p,1,DType> &mu, DType rho){
+            Matrix<p,1,DType> c = c_in(x);
+            Matrix<m,1,DType> h = c_eq(x);
             for (int i = 0; i < p; i++){
-                mu(i) = max(0, mu(i)+rho*c(i));
+                mu(i) = max(static_cast<DType>(0.0), mu(i)+rho*c(i));
             }
             for (int i = 0; i < m; i++){
                 lambda(i) = lambda(i)+rho*h(i);
             }  
         };
         // matrix indicating active inequalites 
-        Matrix<p,p> active_ineq(Matrix<nx,1> x, Matrix<p,1> mu, float rho){
-            Matrix<p,p> Ip;
-            Ip.Fill(0);
-            Matrix<p,1> h = c_in(x);
+        Matrix<p,p,DType> active_ineq(Matrix<nx,1,DType> x, Matrix<p,1,DType> mu, float rho){
+            Matrix<p,p,DType> Ip;
+            Ip.Fill(static_cast<DType>(0));
+            Matrix<p,1,DType> h = c_in(x);
             for (int i = 0; i < p; i++){
                 if (h(i) < 0 && mu(i) == 0){
-                    Ip(i,i) = 0;
+                    Ip(i,i) = static_cast<DType>(0);
                 }
                 else {
                     Ip(i,i) = rho;
@@ -284,19 +286,19 @@ class QP{
             return Ip;           
         };
         // gradient of augmented Lagrangian 
-        Matrix<nx, 1> algradient(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p> mu, float rho){
-            Matrix<nx> Nabla_x_L = stationarity(x, lambda, mu);
+        Matrix<nx, 1, DType> algradient(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu, DType rho){
+            Matrix<nx,1,DType> Nabla_x_L = stationarity(x, lambda, mu);
             if (m+p == 0){
                 return Nabla_x_L;
             }
             else {
-                Matrix<nx> Nabla_x_g; 
-                Nabla_x_g.Fill(0);
+                Matrix<nx,1,DType> Nabla_x_g; 
+                Nabla_x_g.Fill(static_cast<DType>(0));
                 if(m != 0){
                     Nabla_x_g += (~_A*rho) * c_eq(x);    
                 }
                 if(p != 0){
-                    Matrix<p,p> Ip = active_ineq(x, mu, rho);
+                    Matrix<p,p,DType> Ip = active_ineq(x, mu, rho);
                     Nabla_x_g += (~_G*Ip) * c_in(x);
                 }
                 return Nabla_x_L+Nabla_x_g;
@@ -304,45 +306,45 @@ class QP{
             // Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu); 
         };
         // Hessian of augmented Lagrangian 
-        Matrix<nx,nx> alhessian(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho){
-            Matrix<nx,nx> Nabla_xx_L = _Q;
+        Matrix<nx,nx,DType> alhessian(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu, DType rho){
+            Matrix<nx,nx,DType> Nabla_xx_L = _Q;
             if (m+p == 0){
                 return Nabla_xx_L;
             }
             else {
-                Matrix<nx,nx> Nabla_xx_g; 
-                Nabla_xx_g.Fill(0);
+                Matrix<nx,nx,DType> Nabla_xx_g; 
+                Nabla_xx_g.Fill(static_cast<DType>(0));
                 if(m != 0){
                     Nabla_xx_g += (~_A*rho) * (_A);    
                 }
                 if(p != 0){
-                    Matrix<p,p> Ip = active_ineq(x, mu, rho);
+                    Matrix<p,p,DType> Ip = active_ineq(x, mu, rho);
                     Nabla_xx_g += (~_G*Ip) * (_G);
                 }
                 return Nabla_xx_L+Nabla_xx_g;
             }
         };
         // 'Inner' newton solver 
-        Matrix<nx, 1> newton_solve(Matrix<nx,1> x, Matrix<m,1> lambda, Matrix<p,1> mu, float rho, bool verb){
-            Matrix<nx,1> x_sol = x;
+        Matrix<nx, 1, DType> newton_solve(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu, DType rho, bool verb){
+            Matrix<nx,1,DType> x_sol = x;
             for (int i = 0; i < _params -> max_iter_newton; i++){
                 
-                Matrix<nx,1> g = algradient(x_sol, lambda, mu, rho);
-                Matrix<1,1> innerprod = ~g * g;
-                double normg = sqrt(innerprod(0));
+                Matrix<nx,1,DType> g = algradient(x_sol, lambda, mu, rho);
+                Matrix<1,1,DType> innerprod = ~g * g;
+                DType normg = sqrt(innerprod(0));
                 
                 if (normg < _params -> precision_newton){
                     return x_sol;
                 }
 
-                Matrix<nx,nx> H = alhessian(x_sol, lambda, mu, rho);
+                Matrix<nx,nx,DType> H = alhessian(x_sol, lambda, mu, rho);
 
                 // If Hessian of augmented Lagrangian is rank defficient abort procedure 
                 if (Determinant(H)==0.0){
                     x_sol.Fill(0.0/0.0);
                     return x_sol;                    
                 }
-                Matrix<nx> Deltax = -Inverse(H)*g;
+                Matrix<nx,1,DType> Deltax = -Inverse(H)*g;
                 x_sol = x_sol+Deltax;    
             }
             return x_sol;
