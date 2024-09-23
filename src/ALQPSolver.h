@@ -11,7 +11,7 @@ namespace ALQPS {
 class QPparams {
 public:
     QPparams()
-        : max_iter_newton(25),
+        : max_iter_newton(10),
           max_iter_outer(25),
           precision_newton(1e-6),
           precision_primal(1e-6),
@@ -115,8 +115,6 @@ class QP{
         // solving the qp
         QPsol<nx,m,p,DType> solve(String mode = ""){
             
-            Serial.println("im solving");
-            
             bool verb = false;
             if (mode=="verbose") verb=true;
 
@@ -133,7 +131,7 @@ class QP{
 
             Matrix<1,1,DType> innerprod;
             Matrix<m+p,1,DType> rp;
-            DType normrp;
+            double normrp;
 
             DType obj_val; 
             SolverStatus status;
@@ -151,18 +149,18 @@ class QP{
                     // otherwise re enter newton solver in next iteration 
                     Matrix<nx,1,DType> Nabla_x_L = stationarity(x, lambda, mu); 
                     innerprod = ~Nabla_x_L * Nabla_x_L;
-                    DType normg = sqrt(innerprod(0));                    
+                    double normg = sqrt(innerprod(0));
+
                     if (normg < _params -> precision_newton){
                         obj_val = objective(x);
                         status.solved = true; 
                         break;
                     }
                 } 
-                                
                 // update dual variables lambda, mu
                 dual_update(x, lambda, mu, rho); 
                 rho = Phi*rho;
-                
+
                 rp = primal_residual(x, lambda, mu);
                 innerprod = ~rp * rp;
                 normrp = sqrt(innerprod(0));
@@ -174,18 +172,24 @@ class QP{
                     break; 
                 }
             }
-            // primal infeasible
-            if (normrp > _params -> precision_primal){
-                status.pinf = true;
-                obj_val = 0.0/0.0; 
-                x.Fill(0.0/0.0);
+
+            // check for constraint violation
+            if(m+p != 0){
+                // primal infeasible
+                if (normrp > _params -> precision_primal){
+                    status.pinf = true;
+                    obj_val = 0.0/0.0; 
+                    x.Fill(0.0/0.0);
+                }
+
+                // dual infeasible 
+                if (!dual_feasibility(mu)){
+                    status.dinf = true;
+                    obj_val = 0.0/0.0;
+                    x.Fill(0.0/0.0);
+                }
             }
-            // dual infeasible 
-            else if (!dual_feasibility(mu)){
-                status.dinf = true;
-                obj_val = 0.0/0.0;
-                x.Fill(0.0/0.0);
-            }
+
             QPsol<nx,m,p,DType> sol(x,lambda,mu,obj_val,status,verb);
             return sol;            
         };
@@ -206,11 +210,12 @@ class QP{
         // initializes all matrices of given dimensions with zeros 
         void init_QPmat(){
             Matrix<nx,nx, DType> Q;
-            Matrix<nx, 1, DType>  q;
+            Matrix<nx, 1, DType> q;
             Matrix<m, nx, DType> A;
-            Matrix<m,  1, DType>  b;                        
+            Matrix<m,  1, DType> b;                        
             Matrix<p, nx, DType> G;
-            Matrix<p,  1, DType>  h; 
+            Matrix<p,  1, DType> h; 
+
             Q.Fill(static_cast<DType>(0.0));
             q.Fill(static_cast<DType>(0.0));
             A.Fill(static_cast<DType>(0.0));
@@ -248,14 +253,14 @@ class QP{
             Matrix<m,1,DType> c = c_eq(x);
             Matrix<p,1,DType> h = c_in(x);
             for (int i = 0; i < p; i++){
-                h(i) = max(h(i), static_cast<DType>(0));
+                h(i) = max(h(i,0), static_cast<DType>(0));
             }
             return c && h;
         };
         // dual problem requires non negative duals 
         bool dual_feasibility(Matrix<p,1,DType> mu){
             for (int i = 0; i < p; i++){
-                if(mu(i) < 0.0) return false;
+                if(mu(i,0) < 0.0) return false;
             }
             return true;  
         }
@@ -264,19 +269,20 @@ class QP{
             Matrix<p,1,DType> c = c_in(x);
             Matrix<m,1,DType> h = c_eq(x);
             for (int i = 0; i < p; i++){
-                mu(i) = max(static_cast<DType>(0.0), mu(i)+rho*c(i));
+                mu(i,0) = max(static_cast<DType>(0.0), mu(i)+rho*c(i));
             }
             for (int i = 0; i < m; i++){
-                lambda(i) = lambda(i)+rho*h(i);
+                lambda(i,0) = lambda(i,0)+rho*h(i,0);
             }  
         };
+
         // matrix indicating active inequalites 
         Matrix<p,p,DType> active_ineq(Matrix<nx,1,DType> x, Matrix<p,1,DType> mu, float rho){
             Matrix<p,p,DType> Ip;
             Ip.Fill(static_cast<DType>(0));
             Matrix<p,1,DType> h = c_in(x);
             for (int i = 0; i < p; i++){
-                if (h(i) < 0 && mu(i) == 0){
+                if (h(i,0) < 0 && mu(i,0) == 0){
                     Ip(i,i) = static_cast<DType>(0);
                 }
                 else {
@@ -331,7 +337,7 @@ class QP{
                 
                 Matrix<nx,1,DType> g = algradient(x_sol, lambda, mu, rho);
                 Matrix<1,1,DType> innerprod = ~g * g;
-                DType normg = sqrt(innerprod(0));
+                double normg = sqrt(innerprod(0));
                 
                 if (normg < _params -> precision_newton){
                     return x_sol;
@@ -340,12 +346,13 @@ class QP{
                 Matrix<nx,nx,DType> H = alhessian(x_sol, lambda, mu, rho);
 
                 // If Hessian of augmented Lagrangian is rank defficient abort procedure 
+                
                 if (Determinant(H)==0.0){
                     x_sol.Fill(0.0/0.0);
                     return x_sol;                    
                 }
                 Matrix<nx,1,DType> Deltax = -Inverse(H)*g;
-                x_sol = x_sol+Deltax;    
+                x_sol = x_sol+Deltax;
             }
             return x_sol;
         };
