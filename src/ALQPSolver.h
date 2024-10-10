@@ -3,6 +3,11 @@
 #include <Arduino.h>
 #include <BasicLinearAlgebra.h>
 
+using namespace BLA;
+
+namespace ALQPS {
+
+
 template<int n, int m, typename DType>
 void printMatrix(const Matrix<n, m, DType>& mat) {
     for (int i = 0; i < n; ++i) {
