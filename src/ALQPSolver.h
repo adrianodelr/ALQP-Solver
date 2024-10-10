@@ -3,23 +3,6 @@
 #include <Arduino.h>
 #include <BasicLinearAlgebra.h>
 
-extern unsigned int __heap_start;
-extern void *__brkval;
-
-using namespace BLA;
-
-namespace ALQPS {
-
-int freeMemory() {
-  int free_memory;
-  if ((int)__brkval == 0) {
-    free_memory = ((int)&free_memory) - ((int)&__heap_start);
-  } else {
-    free_memory = ((int)&free_memory) - ((int)__brkval);
-  }
-  return free_memory;
-}
-
 template<int n, int m, typename DType>
 void printMatrix(const Matrix<n, m, DType>& mat) {
     for (int i = 0; i < n; ++i) {
