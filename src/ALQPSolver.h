@@ -3,9 +3,33 @@
 #include <Arduino.h>
 #include <BasicLinearAlgebra.h>
 
+extern unsigned int __heap_start;
+extern void *__brkval;
+
 using namespace BLA;
 
 namespace ALQPS {
+
+int freeMemory() {
+  int free_memory;
+  if ((int)__brkval == 0) {
+    free_memory = ((int)&free_memory) - ((int)&__heap_start);
+  } else {
+    free_memory = ((int)&free_memory) - ((int)__brkval);
+  }
+  return free_memory;
+}
+
+template<int n, int m, typename DType>
+void printMatrix(const Matrix<n, m, DType>& mat) {
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            Serial.print(mat(i, j));
+            Serial.print(" ");
+        }
+        Serial.println();
+    }
+}
 
 // parameter setting for solver 
 class QPparams {
@@ -197,7 +221,7 @@ class QP{
     private: 
         // QP matrices 
         Matrix<nx,nx, DType> _Q;           // quadratic coefficient matrix  
-        Matrix<nx, 1, DType>  _q;           // linear coefficient vector 
+        Matrix<nx, 1, DType> _q;           // linear coefficient vector 
         Matrix<m, nx, DType> _A;           // equality constraint matrix 
         Matrix<m,  1, DType> _b;           // equality constraint vector 
         Matrix<p, nx, DType> _G;           // inequality constraint matrix 
@@ -226,19 +250,19 @@ class QP{
         }
 
         // returns left hand side of the equality constraints   
-        Matrix<m,1, DType> c_eq(Matrix<nx,1,DType> x){
+        Matrix<m,1, DType> c_eq(const Matrix<nx,1,DType>& x){
             return _A*x - _b; 
         };
         // returns left hand side of the inequality constraints   
-        Matrix<p,1, DType> c_in(Matrix<nx,1,DType> x){
+        Matrix<p,1, DType> c_in(const Matrix<nx,1,DType>& x){
             return _G*x - _h; 
         };
         // computes the objective value 
-        float objective(Matrix<nx,1,DType> x){
+        float objective(const Matrix<nx,1,DType>& x){
             return 0.5*(~x*_Q*x)(0) + (~_q*x)(0);             
         };
         // gradient of Lagrangian 
-        Matrix<nx,1,DType> stationarity(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu){
+        Matrix<nx,1,DType> stationarity(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu){
             Matrix<nx,1,DType> Nabla_x_L = _Q*x + _q; 
             if (m != 0) {
                 Nabla_x_L += ~_A*lambda;
@@ -249,7 +273,7 @@ class QP{
             return Nabla_x_L;
         }; 
         // measures how much constraint violation
-        Matrix<m+p,1,DType>  primal_residual(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu){
+        Matrix<m+p,1,DType>  primal_residual(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu){
             Matrix<m,1,DType> c = c_eq(x);
             Matrix<p,1,DType> h = c_in(x);
             for (int i = 0; i < p; i++){
@@ -258,14 +282,14 @@ class QP{
             return c && h;
         };
         // dual problem requires non negative duals 
-        bool dual_feasibility(Matrix<p,1,DType> mu){
+        bool dual_feasibility(const Matrix<p,1,DType>& mu){
             for (int i = 0; i < p; i++){
                 if(mu(i,0) < 0.0) return false;
             }
             return true;  
         }
 
-        void dual_update(Matrix<nx,1,DType> x, Matrix<m,1,DType> &lambda, Matrix<p,1,DType> &mu, DType rho){
+        void dual_update(const Matrix<nx,1,DType>& x, Matrix<m,1,DType> &lambda, Matrix<p,1,DType> &mu, const DType& rho){
             Matrix<p,1,DType> c = c_in(x);
             Matrix<m,1,DType> h = c_eq(x);
             for (int i = 0; i < p; i++){
@@ -277,7 +301,7 @@ class QP{
         };
 
         // matrix indicating active inequalites 
-        Matrix<p,p,DType> active_ineq(Matrix<nx,1,DType> x, Matrix<p,1,DType> mu, float rho){
+        Matrix<p,p,DType> active_ineq(const Matrix<nx,1,DType>& x, const Matrix<p,1,DType>& mu, const float& rho){
             Matrix<p,p,DType> Ip;
             Ip.Fill(static_cast<DType>(0));
             Matrix<p,1,DType> h = c_in(x);
@@ -292,7 +316,7 @@ class QP{
             return Ip;           
         };
         // gradient of augmented Lagrangian 
-        Matrix<nx, 1, DType> algradient(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu, DType rho){
+        Matrix<nx, 1, DType> algradient(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho){
             Matrix<nx,1,DType> Nabla_x_L = stationarity(x, lambda, mu);
             if (m+p == 0){
                 return Nabla_x_L;
@@ -312,7 +336,7 @@ class QP{
             // Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu); 
         };
         // Hessian of augmented Lagrangian 
-        Matrix<nx,nx,DType> alhessian(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu, DType rho){
+        Matrix<nx,nx,DType> alhessian(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho){
             Matrix<nx,nx,DType> Nabla_xx_L = _Q;
             if (m+p == 0){
                 return Nabla_xx_L;
@@ -331,7 +355,7 @@ class QP{
             }
         };
         // 'Inner' newton solver 
-        Matrix<nx, 1, DType> newton_solve(Matrix<nx,1,DType> x, Matrix<m,1,DType> lambda, Matrix<p,1,DType> mu, DType rho, bool verb){
+        Matrix<nx, 1, DType> newton_solve(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho, const bool& verb){
             Matrix<nx,1,DType> x_sol = x;
             for (int i = 0; i < _params -> max_iter_newton; i++){
                 
