@@ -167,21 +167,23 @@ class QP{
                         status.solved = true; 
                         break;
                     }
-                } 
-                // update dual variables lambda, mu
-                dual_update(x, lambda, mu, rho); 
-                rho = Phi*rho;
-
-                rp = primal_residual(x, lambda, mu);
-                innerprod = ~rp * rp;
-                normrp = sqrt(innerprod(0));
-                
-                // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
-                if (normrp <  _params -> precision_primal && dual_feasibility(mu)){
-                    obj_val = objective(x);
-                    status.solved = true;
-                    break; 
                 }
+                else { 
+                    // update dual variables lambda, mu
+                    dual_update(x, lambda, mu, rho); 
+                    rho = Phi*rho;
+
+                    rp = primal_residual(x, lambda, mu);
+                    innerprod = ~rp * rp;
+                    normrp = sqrt(innerprod(0));
+                    
+                    // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
+                    if (normrp <  _params -> precision_primal && dual_feasibility(mu)){
+                        obj_val = objective(x);
+                        status.solved = true;
+                        break; 
+                    }
+                }                       
             }
 
             // check for constraint violation
@@ -192,7 +194,6 @@ class QP{
                     obj_val = 0.0/0.0; 
                     x.Fill(0.0/0.0);
                 }
-
                 // dual infeasible 
                 if (!dual_feasibility(mu)){
                     status.dinf = true;
