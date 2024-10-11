@@ -24,7 +24,7 @@ public:
     QPparams()
         : max_iter_newton(10),
           max_iter_outer(25),
-          max_iter_backtrack(25),          
+          max_iter_backtrack(10),          
           precision_newton(1e-5),
           precision_primal(1e-4),
           penalty_initial(1.0),
