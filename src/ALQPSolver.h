@@ -9,9 +9,9 @@ namespace ALQPS {
 
 template<int n, int m, typename DType>
 void printMatrix(const Matrix<n, m, DType>& mat) {
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < m; ++j) {
-            Serial.print(mat(i, j));
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            Serial.print(mat(i, j), 8);
             Serial.print(" ");
         }
         Serial.println();
@@ -24,17 +24,22 @@ public:
     QPparams()
         : max_iter_newton(10),
           max_iter_outer(25),
-          precision_newton(1e-4),
+          max_iter_backtrack(25),          
+          precision_newton(1e-5),
           precision_primal(1e-4),
           penalty_initial(1.0),
-          penalty_scaling(10.0) {}  // Default values
+          penalty_scaling(10.0), 
+          backtrack_beta(0.8)           
+          {}  // Default values
 
     size_t max_iter_newton;
     size_t max_iter_outer;
+    size_t max_iter_backtrack;
     double precision_newton;
     double precision_primal;
     double penalty_initial;
     double penalty_scaling;
+    double backtrack_beta; 
 };
 
 // status indicating solver success or infeasibility
@@ -167,8 +172,8 @@ class QP{
                         status.solved = true; 
                         break;
                     }
-                }
-                else { 
+                } 
+                else {
                     // update dual variables lambda, mu
                     dual_update(x, lambda, mu, rho); 
                     rho = Phi*rho;
@@ -183,7 +188,8 @@ class QP{
                         status.solved = true;
                         break; 
                     }
-                }                       
+                }
+
             }
 
             // check for constraint violation
@@ -194,6 +200,7 @@ class QP{
                     obj_val = 0.0/0.0; 
                     x.Fill(0.0/0.0);
                 }
+
                 // dual infeasible 
                 if (!dual_feasibility(mu)){
                     status.dinf = true;
@@ -345,26 +352,52 @@ class QP{
         // 'Inner' newton solver 
         Matrix<nx, 1, DType> newton_solve(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho, const bool& verb){
             Matrix<nx,1,DType> x_sol = x;
+            
+            Matrix<nx,1,DType> g; 
+            Matrix<1,1,DType> innerprod; 
+            Matrix<nx,nx,DType> H; 
+            Matrix<nx,1,DType> Deltax; 
+
             for (int i = 0; i < _params -> max_iter_newton; i++){
                 
-                Matrix<nx,1,DType> g = algradient(x_sol, lambda, mu, rho);
-                Matrix<1,1,DType> innerprod = ~g * g;
+                g = algradient(x_sol, lambda, mu, rho);
+                innerprod = ~g * g;
                 double normg = sqrt(innerprod(0));
-                
+
                 if (normg < _params -> precision_newton){
                     return x_sol;
                 }
 
-                Matrix<nx,nx,DType> H = alhessian(x_sol, lambda, mu, rho);
+                H = alhessian(x_sol, lambda, mu, rho);
 
                 // If Hessian of augmented Lagrangian is rank defficient abort procedure 
-                
                 if (Determinant(H)==0.0){
                     x_sol.Fill(0.0/0.0);
                     return x_sol;                    
                 }
-                Matrix<nx,1,DType> Deltax = -Inverse(H)*g;
-                x_sol = x_sol+Deltax;
+                Deltax = -Inverse(H)*g;
+                
+                // simple back tracking line search 
+                DType alpha = 1.0;
+                double normg_red; 
+                Matrix<nx,1,DType> x_backtrack;
+
+                for (int i = 0; i < _params -> max_iter_backtrack; i++){
+                    // solution with reduced stepsize
+                    x_backtrack = x_sol+alpha*Deltax;
+                    
+                    // compute residual with reduced stepsize 
+                    g = algradient(x_backtrack, lambda, mu, rho);
+                    innerprod = ~g * g;
+                    double normg_red = sqrt(innerprod(0));
+                    
+                    // if residual before newton step is higher than after, reduce the scaling parameter alpha   
+                    if (normg_red > normg)
+                        alpha *= _params -> backtrack_beta; 
+                    else 
+                        break;
+                }
+                x_sol = x_sol+alpha*Deltax;
             }
             return x_sol;
         };
