@@ -7,7 +7,6 @@ using namespace BLA;
 
 namespace ALQPS {
 
-
 template<int n, int m, typename DType>
 void printMatrix(const Matrix<n, m, DType>& mat) {
     for (int i = 0; i < n; ++i) {
@@ -25,8 +24,8 @@ public:
     QPparams()
         : max_iter_newton(10),
           max_iter_outer(25),
-          precision_newton(1e-6),
-          precision_primal(1e-6),
+          precision_newton(1e-4),
+          precision_primal(1e-4),
           penalty_initial(1.0),
           penalty_scaling(10.0) {}  // Default values
 
