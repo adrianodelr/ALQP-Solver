@@ -54,8 +54,8 @@ struct SolverStatus{
 template<int nx, int m, int p, typename DType = float>
 class QPsol{
     public:
-        QPsol(Matrix<nx,1,DType> x_, Matrix<m,1,DType> lambda_, Matrix<p,1,DType> mu_, 
-              float obj_val_, SolverStatus status, bool verbose) 
+        QPsol(const Matrix<nx,1,DType>& x_, const Matrix<m,1,DType>& lambda_, const Matrix<p,1,DType>& mu_, 
+              float obj_val_, const SolverStatus& status, bool verbose) 
             : x(x_), 
               lambda(lambda_), 
               mu(mu_), 
@@ -81,19 +81,19 @@ class QPsol{
 
         void print_report(){
             
-            Serial.print("status: ");
-            if (_solved) Serial.println("solved");
-            else if (_pinf) Serial.println("primal infeasible");
-            else if (_dinf) Serial.println("dual infeasible");  
-            else if (_degh) Serial.println("singular Hessian");  
+            Serial.print(F("status: "));
+            if (_solved) Serial.println(F("solved"));
+            else if (_pinf) Serial.println(F("primal infeasible"));
+            else if (_dinf) Serial.println(F("dual infeasible"));  
+            else if (_degh) Serial.println(F("singular Hessian"));  
 
-            Serial.print("optimal objective: ");
+            Serial.print(F("optimal objective: "));
             Serial.println(obj_val);
-            Serial.print("primal value (solution): ");
+            Serial.print(F("primal value (solution): "));
             Serial.println(x);
-            Serial.print("dual value (equalities): ");
+            Serial.print(F("dual value (equalities): "));
             Serial.println(lambda);
-            Serial.print("dual value (inequalities): ");
+            Serial.print(F("dual value (inequalities): "));
             Serial.println(mu);
         }          
 };
@@ -244,11 +244,11 @@ class QP{
             update(Q, q, A, b, G, h);
         }
 
-        // returns left hand side of the equality constraints   
+        // returns 'left hand side' of the equality constraints   
         Matrix<m,1, DType> c_eq(const Matrix<nx,1,DType>& x){
             return _A*x - _b; 
         };
-        // returns left hand side of the inequality constraints   
+        // returns 'left hand side' of the inequality constraints   
         Matrix<p,1, DType> c_in(const Matrix<nx,1,DType>& x){
             return _G*x - _h; 
         };
@@ -283,7 +283,7 @@ class QP{
             }
             return true;  
         }
-
+        // update multipliers mu, lambda   
         void dual_update(const Matrix<nx,1,DType>& x, Matrix<m,1,DType> &lambda, Matrix<p,1,DType> &mu, const DType& rho){
             Matrix<p,1,DType> c = c_in(x);
             Matrix<m,1,DType> h = c_eq(x);
