@@ -377,10 +377,10 @@ class QP{
                 }
                 Deltax = -Inverse(H)*g;
                 
-                // simple back tracking line search 
-                DType alpha = 1.0;
-                double normg_red; 
-                Matrix<nx,1,DType> x_backtrack;
+                // simple back tracking line search on the AL gradient residual 
+                DType alpha = 1.0;                  // scaling parameter 
+                double normg_red;                   // gradient residual after taking reduced newton step 
+                Matrix<nx,1,DType> x_backtrack;     // solution after taking reduced newton step
 
                 for (int i = 0; i < _params -> max_iter_backtrack; i++){
                     // solution with reduced stepsize
@@ -397,7 +397,7 @@ class QP{
                     else 
                         break;
                 }
-                x_sol = x_sol+alpha*Deltax;
+                x_sol = x_backtrack;
             }
             return x_sol;
         };
