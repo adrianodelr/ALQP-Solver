@@ -389,7 +389,7 @@ class QP{
                     // compute residual with reduced stepsize 
                     g = algradient(x_backtrack, lambda, mu, rho);
                     innerprod = ~g * g;
-                    double normg_red = sqrt(innerprod(0));
+                    normg_red = sqrt(innerprod(0));
                     
                     // if residual before newton step is higher than after, reduce the scaling parameter alpha   
                     if (normg_red > normg)
