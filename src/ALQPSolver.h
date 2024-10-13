@@ -7,17 +7,6 @@ using namespace BLA;
 
 namespace ALQPS {
 
-template<int n, int m, typename DType>
-void printMatrix(const Matrix<n, m, DType>& mat) {
-    for (int i = 0; i < m; ++i) {
-        for (int j = 0; j < n; ++j) {
-            Serial.print(mat(i, j), 8);
-            Serial.print(" ");
-        }
-        Serial.println();
-    }
-}
-
 // parameter setting for solver 
 class QPparams {
 public:
@@ -129,7 +118,7 @@ class QP{
         }
 
         // solving the qp
-        QPsol<nx,m,p,DType> solve(String mode = ""){
+        QPsol<nx,m,p,DType> solve(const String& mode = ""){
             
             bool verb = false;
             if (mode=="verbose") verb=true;
@@ -145,9 +134,9 @@ class QP{
             DType rho = _params -> penalty_initial;
             DType Phi = _params -> penalty_scaling;
 
-            Matrix<1,1,DType> innerprod;
-            Matrix<m+p,1,DType> rp;
-            double normrp;
+            Matrix<m+p,1,DType> pr;
+            Matrix<nx,1,DType> Nabla_x_L;
+            double prnorm;
 
             DType obj_val; 
             SolverStatus status;
@@ -162,12 +151,11 @@ class QP{
                 }                
                 if (m+p == 0){
                     // reconsider if stationarity condition is satisfied to determine if x is truly the unconstrained optimum                                            
-                    // otherwise re enter newton solver in next iteration 
-                    Matrix<nx,1,DType> Nabla_x_L = stationarity(x, lambda, mu); 
-                    innerprod = ~Nabla_x_L * Nabla_x_L;
-                    double normg = sqrt(innerprod(0));
+                    // otherwise re enter newton solver in next iteration
+                    Nabla_x_L = stationarity(x, lambda, mu); 
+                    double gnorm = residual_norm(Nabla_x_L);                    
 
-                    if (normg < _params -> precision_newton){
+                    if (gnorm < _params -> precision_newton){
                         obj_val = objective(x);
                         status.solved = true; 
                         break;
@@ -178,24 +166,22 @@ class QP{
                     dual_update(x, lambda, mu, rho); 
                     rho = Phi*rho;
 
-                    rp = primal_residual(x, lambda, mu);
-                    innerprod = ~rp * rp;
-                    normrp = sqrt(innerprod(0));
+                    pr = primal_residual(x, lambda, mu);
+                    prnorm = sqrt((~pr * pr)(0));
                     
                     // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
-                    if (normrp <  _params -> precision_primal && dual_feasibility(mu)){
+                    if (prnorm <  _params -> precision_primal && dual_feasibility(mu)){
                         obj_val = objective(x);
                         status.solved = true;
                         break; 
                     }
                 }
-
             }
 
             // check for constraint violation
             if(m+p != 0){
                 // primal infeasible
-                if (normrp > _params -> precision_primal){
+                if (prnorm > _params -> precision_primal){
                     status.pinf = true;
                     obj_val = 0.0/0.0; 
                     x.Fill(0.0/0.0);
@@ -245,15 +231,20 @@ class QP{
         }
 
         // returns 'left hand side' of the equality constraints   
-        Matrix<m,1, DType> c_eq(const Matrix<nx,1,DType>& x){
+        inline Matrix<m,1, DType> c_eq(const Matrix<nx,1,DType>& x){
             return _A*x - _b; 
         };
         // returns 'left hand side' of the inequality constraints   
-        Matrix<p,1, DType> c_in(const Matrix<nx,1,DType>& x){
+        inline Matrix<p,1, DType> c_in(const Matrix<nx,1,DType>& x){
             return _G*x - _h; 
         };
+        // returns norm of a residual vector   
+        inline DType residual_norm(const Matrix<nx,1,DType>& g){
+            return sqrt((~g * g)(0));
+        }
+
         // computes the objective value 
-        float objective(const Matrix<nx,1,DType>& x){
+        DType objective(const Matrix<nx,1,DType>& x){
             return 0.5*(~x*_Q*x)(0) + (~_q*x)(0);             
         };
         // gradient of Lagrangian 
@@ -267,6 +258,7 @@ class QP{
             }
             return Nabla_x_L;
         }; 
+
         // measures how much constraint violation
         Matrix<m+p,1,DType>  primal_residual(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu){
             Matrix<m,1,DType> c = c_eq(x);
@@ -276,6 +268,7 @@ class QP{
             }
             return c && h;
         };
+
         // dual problem requires non negative duals 
         bool dual_feasibility(const Matrix<p,1,DType>& mu){
             for (int i = 0; i < p; i++){
@@ -283,7 +276,7 @@ class QP{
             }
             return true;  
         }
-        // update multipliers mu, lambda   
+
         void dual_update(const Matrix<nx,1,DType>& x, Matrix<m,1,DType> &lambda, Matrix<p,1,DType> &mu, const DType& rho){
             Matrix<p,1,DType> c = c_in(x);
             Matrix<m,1,DType> h = c_eq(x);
@@ -310,65 +303,54 @@ class QP{
             }
             return Ip;           
         };
+
         // gradient of augmented Lagrangian 
-        Matrix<nx, 1, DType> algradient(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho){
-            Matrix<nx,1,DType> Nabla_x_L = stationarity(x, lambda, mu);
-            if (m+p == 0){
-                return Nabla_x_L;
-            }
-            else {
-                Matrix<nx,1,DType> Nabla_x_g; 
-                Nabla_x_g.Fill(static_cast<DType>(0));
+        void algradient(Matrix<nx,1,DType>& g, const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho){
+            g = stationarity(x, lambda, mu);
+            if (m+p != 0){
                 if(m != 0){
-                    Nabla_x_g += (~_A*rho) * c_eq(x);    
+                    g += (~_A*rho) * c_eq(x);    
                 }
                 if(p != 0){
                     Matrix<p,p,DType> Ip = active_ineq(x, mu, rho);
-                    Nabla_x_g += (~_G*Ip) * c_in(x);
+                    g += (~_G*Ip) * c_in(x);
                 }
-                return Nabla_x_L+Nabla_x_g;
             }
             // Nabla_x_g = (~_A*rho || ~_G*Ip) * primal_residual(x, lambda, mu); 
         };
+
         // Hessian of augmented Lagrangian 
-        Matrix<nx,nx,DType> alhessian(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho){
-            Matrix<nx,nx,DType> Nabla_xx_L = _Q;
-            if (m+p == 0){
-                return Nabla_xx_L;
+        void alhessian(Matrix<nx,nx,DType>& H, const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho ){
+            H = _Q;
+            if(m != 0){
+                H += (~_A*rho) * (_A);    
             }
-            else {
-                Matrix<nx,nx,DType> Nabla_xx_g; 
-                Nabla_xx_g.Fill(static_cast<DType>(0));
-                if(m != 0){
-                    Nabla_xx_g += (~_A*rho) * (_A);    
-                }
-                if(p != 0){
-                    Matrix<p,p,DType> Ip = active_ineq(x, mu, rho);
-                    Nabla_xx_g += (~_G*Ip) * (_G);
-                }
-                return Nabla_xx_L+Nabla_xx_g;
+            if(p != 0){
+                Matrix<p,p,DType> Ip = active_ineq(x, mu, rho);
+                H += (~_G*Ip) * (_G);
             }
-        };
+        };        
+
         // 'Inner' newton solver 
         Matrix<nx, 1, DType> newton_solve(const Matrix<nx,1,DType>& x, const Matrix<m,1,DType>& lambda, const Matrix<p,1,DType>& mu, const DType& rho, const bool& verb){
-            Matrix<nx,1,DType> x_sol = x;
             
-            Matrix<nx,1,DType> g; 
-            Matrix<1,1,DType> innerprod; 
-            Matrix<nx,nx,DType> H; 
+            Matrix<nx,1,DType> x_sol = x;            
             Matrix<nx,1,DType> Deltax; 
+
+            // gradient and hessian of augmented Lagrangian 
+            Matrix<nx,1,DType> g; 
+            Matrix<nx,nx,DType> H; 
 
             for (int i = 0; i < _params -> max_iter_newton; i++){
                 
-                g = algradient(x_sol, lambda, mu, rho);
-                innerprod = ~g * g;
-                double normg = sqrt(innerprod(0));
+                algradient(g, x_sol, lambda, mu, rho);
+                DType gnorm = residual_norm(g);
 
-                if (normg < _params -> precision_newton){
+                if (gnorm < _params -> precision_newton){
                     return x_sol;
                 }
 
-                H = alhessian(x_sol, lambda, mu, rho);
+                alhessian(H, x_sol, lambda, mu, rho);
 
                 // If Hessian of augmented Lagrangian is rank defficient abort procedure 
                 if (Determinant(H)==0.0){
@@ -379,7 +361,6 @@ class QP{
                 
                 // simple back tracking line search on the AL gradient residual 
                 DType alpha = 1.0;                  // scaling parameter 
-                double normg_red;                   // gradient residual after taking reduced newton step 
                 Matrix<nx,1,DType> x_backtrack;     // solution after taking reduced newton step
 
                 for (int i = 0; i < _params -> max_iter_backtrack; i++){
@@ -387,12 +368,11 @@ class QP{
                     x_backtrack = x_sol+alpha*Deltax;
                     
                     // compute residual with reduced stepsize 
-                    g = algradient(x_backtrack, lambda, mu, rho);
-                    innerprod = ~g * g;
-                    normg_red = sqrt(innerprod(0));
-                    
+                    algradient(g, x_backtrack, lambda, mu, rho);
+                    DType gnorm_red = residual_norm(g);
+                        
                     // if residual before newton step is higher than after, reduce the scaling parameter alpha   
-                    if (normg_red > normg)
+                    if (gnorm_red > gnorm)
                         alpha *= _params -> backtrack_beta; 
                     else 
                         break;
