@@ -194,7 +194,6 @@ class QP{
                     x.Fill(0.0/0.0);
                 }
             }
-
             QPsol<nx,m,p,DType> sol(x,lambda,mu,obj_val,status,verb);
             return sol;            
         };
@@ -351,14 +350,16 @@ class QP{
                 }
 
                 alhessian(H, x_sol, lambda, mu, rho);
+                
+                auto Hdecomp = LUDecompose(H);
+                Deltax = LUSolve(Hdecomp, -g);
 
                 // If Hessian of augmented Lagrangian is rank defficient abort procedure 
-                if (Determinant(H)==0.0){
+                if (Hdecomp.singular){
                     x_sol.Fill(0.0/0.0);
                     return x_sol;                    
                 }
-                Deltax = -Inverse(H)*g;
-                
+
                 // simple back tracking line search on the AL gradient residual 
                 DType alpha = 1.0;                  // scaling parameter 
                 Matrix<nx,1,DType> x_backtrack;     // solution after taking reduced newton step
