@@ -3,9 +3,22 @@
 #include <Arduino.h>
 #include <BasicLinearAlgebra.h>
 
+extern unsigned int __heap_start;
+extern void *__brkval;
+
 using namespace BLA;
 
 namespace ALQPS {
+
+int freeMemory() {
+  int free_memory;
+  if ((int)__brkval == 0) {
+    free_memory = ((int)&free_memory) - ((int)&__heap_start);
+  } else {
+    free_memory = ((int)&free_memory) - ((int)__brkval);
+  }
+  return free_memory;
+}
 
 // parameter setting for solver 
 class QPparams {
@@ -102,14 +115,18 @@ class QP{
             _h = h;            
         }; 
         // Default constructor for empty qp
-        QP() 
-            : _params(new QPparams()), _alloc(true) {            
+        QP(const String& mode = "") 
+            : _params(new QPparams()), _alloc(true) {
             init_QPmat();
+            if (mode=="D") _debugging=true;
+            else _debugging=false;                                         
         }; 
 
-        QP(const QPparams& parameters) 
+        QP(const QPparams& parameters, const String& mode = "") 
             : _params(&parameters), _alloc(false){
             init_QPmat();
+            if (mode=="D") _debugging=true;
+            else _debugging=false;                                             
         }
 
         // destructor in case of taking default parameters 
@@ -120,6 +137,12 @@ class QP{
         // solving the qp
         QPsol<nx,m,p,DType> solve(const String& mode = ""){
             
+            if (_debugging){
+                Serial.print("Free RAM when solving the QP: ");
+                Serial.print(freeMemory());            
+                Serial.println(" kB");
+            }
+
             bool verb = false;
             if (mode=="verbose") verb=true;
 
@@ -210,6 +233,7 @@ class QP{
         // Solver settings
         const QPparams* _params;
         bool _alloc; 
+        bool _debugging; 
         
         // initializes all matrices of given dimensions with zeros 
         void init_QPmat(){
@@ -336,7 +360,7 @@ class QP{
             Matrix<nx,1,DType> x_sol = x;            
             Matrix<nx,1,DType> Deltax; 
 
-            // gradient and hessian of augmented Lagrangian 
+            // preallocate gradient and Hessian of augmented Lagrangian 
             Matrix<nx,1,DType> g; 
             Matrix<nx,nx,DType> H; 
 
@@ -363,14 +387,14 @@ class QP{
                 // simple back tracking line search on the AL gradient residual 
                 DType alpha = 1.0;                  // scaling parameter 
                 Matrix<nx,1,DType> x_backtrack;     // solution after taking reduced newton step
-
+                DType gnorm_red;                    // norm of AL gradient residual after taking reduced newton step 
                 for (int i = 0; i < _params -> max_iter_backtrack; i++){
                     // solution with reduced stepsize
                     x_backtrack = x_sol+alpha*Deltax;
                     
                     // compute residual with reduced stepsize 
                     algradient(g, x_backtrack, lambda, mu, rho);
-                    DType gnorm_red = residual_norm(g);
+                    gnorm_red = residual_norm(g);
                         
                     // if residual before newton step is higher than after, reduce the scaling parameter alpha   
                     if (gnorm_red > gnorm)
@@ -378,6 +402,15 @@ class QP{
                     else 
                         break;
                 }
+                if (_debugging){
+                    Serial.print(F("Newton iteration "));
+                    Serial.print(i);
+                    Serial.print(F(": norm of gradient residual: ")); 
+                    Serial.print(gnorm_red, 10); 
+                    Serial.print(F(" vs ")); 
+                    Serial.print(_params -> precision_newton, 10); 
+                    Serial.println(F(" (threshold) ")); 
+                }        
                 x_sol = x_backtrack;
             }
             return x_sol;
