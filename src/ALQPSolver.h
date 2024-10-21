@@ -21,26 +21,17 @@ int freeMemory() {
 }
 
 // parameter setting for solver 
-class QPparams {
-public:
-    QPparams()
-        : max_iter_outer(5),
-          max_iter_newton(10),
-          max_iter_backtrack(10),          
-          precision_newton(1e-5),
-          precision_primal(1e-4),
-          penalty_initial(1.0),
-          penalty_scaling(10.0), 
-          backtrack_beta(0.8)
-          {}  // Default values
-    size_t max_iter_newton;
-    size_t max_iter_outer;
-    size_t max_iter_backtrack;
-    double precision_newton;
-    double precision_primal;
-    double penalty_initial;
-    double penalty_scaling;
-    double backtrack_beta; 
+struct QPparams{
+    size_t max_iter_newton = 5;
+    size_t max_iter_outer = 10;
+    size_t max_iter_backtrack = 10;
+    double precision_newton = 1e-3;
+    double precision_primal = 1e-3;
+    double penalty_initial = 1.0;
+    double penalty_scaling = 10.0;
+    double backtrack_beta = 0.75;
+    bool   debugging = false;
+    bool   warm_starting = true;  
 };
 
 // status indicating solver success or infeasibility
@@ -121,11 +112,10 @@ class QP{
         }; 
 
         // Default constructor for empty qp
-        QP(const String& mode = "") 
-            : _params(new QPparams()), _alloc(true) {
+        QP() 
+            : _params(new QPparams()), 
+              _alloc(true) {
             QPZero();
-            if (mode=="D") _debugging=true;
-            else _debugging=false;       
         };
 
         // Destructor
@@ -134,26 +124,31 @@ class QP{
         }
 
         // Constructor accepting a QPparams object
-        QP(const QPparams& parameters, const String& mode = "") 
-            : _params(&parameters), _alloc(false){
+        QP(const QPparams& parameters) 
+            : _params(&parameters), 
+              _alloc(false){
             QPZero();
-            if (mode=="D") _debugging=true;
-            else _debugging=false;                                             
         }
 
         // Move constructor 
         QP(QP&& other) noexcept
-            : _params(other._params),
-              _alloc(other._alloc),
-              _debugging(other._debugging),
+            : _alloc(other._alloc),
               _Q(other._Q),
               _q(other._q),
               _A(other._A),
               _b(other._b),
               _G(other._G),
-              _h(other._h){
-            
+              _h(other._h),
+              _x(other._x),
+              _lambda(other._lambda),
+              _mu(other._mu){
+
             other._params = nullptr;
+            if (_alloc) {
+                _params = new QPparams(*other._params); 
+            } else {
+                _params = other._params; 
+            }            
             other._alloc = false;
             // reset other matrices to zero
             QPZero(other);
@@ -167,9 +162,11 @@ class QP{
                     delete _params; 
                 }
 
-                _params = other._params;
-                _alloc = other._alloc;
-                _debugging = other._debugging;
+                if (_alloc) {
+                    _params = new QPparams(*other._params);
+                } else {
+                    _params = other._params;
+                }
 
                 _Q = other._Q;
                 _q = other._q;
@@ -177,6 +174,9 @@ class QP{
                 _b = other._b;
                 _G = other._G;
                 _h = other._h;
+                _x = other._x;
+                _lambda = other._lambda;
+                _mu = other._mu;
 
                 other._params = nullptr;
                 other._alloc = false;
@@ -189,13 +189,16 @@ class QP{
         // Copy constructor
         QP(const QP& other)
             : _alloc(other._alloc),  
-            _debugging(other._debugging),  
             _Q(other._Q),  
             _q(other._q),
             _A(other._A),
             _b(other._b),
             _G(other._G),
-            _h(other._h){
+            _h(other._h),
+            _x(other._x),
+            _lambda(other._lambda),
+            _mu(other._mu){
+
             _params = new QPparams(*other._params);  
         }
 
@@ -208,13 +211,15 @@ class QP{
                 }
 
                 _alloc = other._alloc;
-                _debugging = other._debugging;
                 _Q = other._Q;  
                 _q = other._q;
                 _A = other._A;
                 _b = other._b;
                 _G = other._G;
                 _h = other._h;
+                _x = other._x;
+                _lambda = other._lambda;
+                _mu = other._mu;
 
                 _params = new QPparams(*other._params); 
             }
@@ -224,7 +229,7 @@ class QP{
         // solving the qp
         QPsol<nx,m,p,DType> solve(const String& mode = ""){
 
-            if (_debugging){
+            if (_params -> debugging){
                 Serial.print("Free RAM when solving the QP: ");
                 Serial.print(freeMemory());            
                 Serial.println(" kB");
@@ -237,10 +242,18 @@ class QP{
             Matrix<m ,1,DType> lambda;
             Matrix<p ,1,DType> mu;     
 
-            AllZero(x);
-            AllZero(lambda);
-            AllZero(mu);
-
+            // use last solution as initial guess 
+            if (_params -> warm_starting){
+                x = _x; 
+                lambda = _lambda;
+                mu = _mu;                
+            }
+            else {
+                AllZero(x);
+                AllZero(lambda);
+                AllZero(mu);
+            }
+                         
             DType rho = _params -> penalty_initial;
             DType Phi = _params -> penalty_scaling;
 
@@ -268,6 +281,9 @@ class QP{
                     if (gnorm < _params -> precision_newton){
                         obj_val = objective(x);
                         status.solved = true; 
+                        if (_params -> warm_starting){
+                            _x = x; 
+                        }
                         break;
                     }
                 } 
@@ -283,6 +299,11 @@ class QP{
                     if (prnorm <  _params -> precision_primal && dual_feasibility(mu)){
                         obj_val = objective(x);
                         status.solved = true;
+                        if (_params -> warm_starting){
+                            _x = x;
+                            _lambda = lambda;
+                            _mu = mu; 
+                        }                                                
                         break; 
                     }
                 }
@@ -317,10 +338,15 @@ class QP{
         Matrix<p, nx, DType> _G;           // inequality constraint matrix 
         Matrix<p,  1, DType> _h;           // inequality constraint vector 
         
+        Matrix<nx, 1, DType> _x;        // warm starting 
+        Matrix<m,  1, DType> _lambda;   // warm starting 
+        Matrix<p,  1, DType> _mu;       // warm starting 
+
         // Solver settings
         const QPparams* _params;
         bool _alloc; 
-        bool _debugging; 
+        // bool _debugging; 
+
         
         // initializes all matrices of 'this' with zeros 
         void QPZero(){
@@ -330,6 +356,9 @@ class QP{
             AllZero(_b);
             AllZero(_G);
             AllZero(_h);
+            AllZero(_x);
+            AllZero(_lambda);
+            AllZero(_mu);
         }
 
         // initializes all matrices of qp with zeros 
@@ -340,6 +369,9 @@ class QP{
             AllZero(qp._b);
             AllZero(qp._G);
             AllZero(qp._h);
+            AllZero(qp._x);
+            AllZero(qp._lambda);
+            AllZero(qp._mu);
         }
 
         // returns residual vector of the equality constraints   
@@ -492,7 +524,7 @@ class QP{
                     else 
                         break;
                 }
-                if (_debugging){
+                if (_params -> debugging){
                     Serial.print(F("Newton iteration "));
                     Serial.print(i);
                     Serial.print(F(": norm of gradient residual: ")); 
