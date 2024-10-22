@@ -44,8 +44,8 @@ The QP is built as follows and can be updated sequentially at runtime, as e.g. r
 QP<nx,m,p> qp; 
 qp.update(Q,q,A,b,G,h); 
 ```
-It is possible set the solver parameters by creating a `QPparams` object, and passing it to the constructor. It is for instance possible, enable a debugging mode, which will print out
-information about the available RAM during the solving process and solver convergence: 
+It is possible set the **solver parameters** by creating a `QPparams` object, and passing it to the constructor. It is for instance possible to enable a debugging mode, which will print out
+information about solver convergence and the available RAM during the solving process: 
 
 ```cpp
 // build and update the quadratic program 
@@ -71,6 +71,19 @@ Other solver parameters which can be accessed are:
 | debugging          | enables debugging mode                               | false |
 | warm_starting      | warm starting with previous primal and dual solution | true  |
 
+For creating an **unconstrained QP**, the dimensions of the nonexistent matrices are set to zero, and an empty matrix is passed to the update function:
+```cpp
+// QP dimensions
+const int n = 2;
+
+// quadratic objective
+Matrix<n,n> Q = {1, 0, 0, 1};
+Matrix<n,1> q = {1, -1};
+// build and update the quadratic program 
+QP<n,0,0> qp; 
+qp.update(Q,q,{},{},{},{});      
+```
+
 ### Solving a QP
 Solving the QP will return a solution object which, alongside the primal solution, contains values of the according dual variables, the objective value, and information about success of the solver. 
 ```cpp
@@ -94,20 +107,7 @@ dual value (equalities): [[1.00],[-2.00]]
 dual value (inequalities): [[0.00]]
 ```
 
-For creating an unconstrained QP, the dimensions of the nonexistent matrices are set to zero, and an empty matrix is passed to the update function:
-```cpp
-// QP dimensions
-const int n = 2;
-const int m = 0;
-const int p = 0;
 
-// quadratic objective
-Matrix<n,n> Q = {1, 0, 0, 1};
-Matrix<n,1> q = {1, -1};
-// build and update the quadratic program 
-QP<n,m,p> qp; 
-qp.update(Q,q,{},{},{},{});      
-```
 
 ### Infeasibility detection and handling 
 The solver will check for stationarity, as well as primal and dual feasibility, when solving a constrained QP. If the QP is unconstrained, only stationarity is considered. In case the solver fails to converge, or feasibility is not achieved, the primal solution and objective in the returned solution object will be set to NaN (easily detected with `isnan()`). In verbose mode, this will be also visible in the solver's status report.
