@@ -111,10 +111,30 @@ class QP{
             _h = h;       
         }; 
 
+        // Update functions for individual matrices 
+        void update_Q(const Matrix<nx,nx, DType>& Q){
+            _Q = Q;
+        }; 
+        void update_q(const Matrix<nx,1,DType>& q){
+            _q = q;
+        };
+        void update_A(Matrix<m, nx, DType>& A){
+            _A = A;
+        }; 
+        void update_b(const Matrix<m, 1,DType>& b){
+            _b = b;
+        };
+        void update_G(const Matrix<p, nx, DType>& G){
+            _G = G;
+        }; 
+        void update_h(const Matrix<p, 1,DType>& h){
+            _h = h;
+        };
+
+
         // Default constructor for empty qp
         QP() 
-            : _params(new QPparams()), 
-              _alloc(true) {
+            : _params(new QPparams()), _alloc(true) {
             QPZero();
         };
 
@@ -125,8 +145,7 @@ class QP{
 
         // Constructor accepting a QPparams object
         QP(const QPparams& parameters) 
-            : _params(&parameters), 
-              _alloc(false){
+            : _params(&parameters), _alloc(false){
             QPZero();
         }
 
@@ -294,7 +313,17 @@ class QP{
 
                     pr = primal_residual(x, lambda, mu);
                     prnorm = sqrt((~pr * pr)(0));
-                    
+
+                    if (_params -> debugging){
+                        Serial.print(F("Outer loop iteration "));
+                        Serial.print(i);
+                        Serial.print(F(": norm of primal residual: ")); 
+                        Serial.print(prnorm, 10); 
+                        Serial.print(F(" vs ")); 
+                        Serial.print(_params -> precision_primal, 10); 
+                        Serial.println(F(" (threshold) ")); 
+                    } 
+
                     // verify if subset of KKT conditions (primal+dual feasibility) are satisfied 
                     if (prnorm <  _params -> precision_primal && dual_feasibility(mu)){
                         obj_val = objective(x);
