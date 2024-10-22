@@ -15,8 +15,13 @@ $$\begin{align}
 Here $\mathbf{Q} \in \mathbb{R}^{n \times n}$ and $\mathbf{q}\in \mathbb{R}^{n}$ are quadratic and linear coefficient matrix, respectively, which determine our quadratic objective. Equality constraints are represented by matrix $\mathbf{A}\in \mathbb{R}^{m \times n}$ and vector $\mathbf{b}\in \mathbb{R}^m$, inequality constraints by matrix $\mathbf{G} \in \mathbb{R}^{p \times n}$ and vector $\mathbf{h}\in \mathbb{R}^p$. (This notation also is used throughout the code, and is conform with the notation used in the tutorial linked above.)
 
 ## Usage 
+### Building and updating a QP
 Defining a QP is fairly simple. Matrices can be built according to the documentation of the Basic Linear Algebra library linked above:
 ```cpp
+#include "ALQPSolver.h"
+
+using namespace ALQPS;
+
 // QP dimensions
 const int n = 2;
 const int m = 2;
@@ -39,6 +44,34 @@ The QP is built as follows and can be updated sequentially at runtime, as e.g. r
 QP<nx,m,p> qp; 
 qp.update(Q,q,A,b,G,h); 
 ```
+It is possible set the solver parameters by creating a `QPparams` object, and passing it to the constructor. It is for instance possible, enable a debugging mode, which will print out
+information about the available RAM during the solving process and solver convergence: 
+
+```cpp
+// build and update the quadratic program 
+QPparams params; 
+params.debugging = true;
+
+QP<n,m,p> qp(params); 
+qp.update(Q,q,A,b,G,h); 
+
+```
+Other solver parameters which can be accessed are:
+
+| Parameter          | Description                                          |Default|
+| :----------------- |:---------------------------------------------------- |:----- |
+| max_iter_newton    | max. inner Newton solver iterations                  | 5     |
+| max_iter_outer     | max. outer loop iterations                           | 10    |
+| max_iter_backtrack | max. backtracking line search iterations             | 10    |
+| precision_newton   | min. norm of gradient residual                       | 1e-4  |
+| precision_primal   | min. norm of primal residual                         | 1e-4  |
+| penalty_initial    | initial value of penalty parameter                   | 1.0   |
+| penalty_scaling    | factor which increases penalty parameter             | 10.0  |
+| backtrack_beta     | factor which decreases step size in line search      | 0.75  |
+| debugging          | enables debugging mode                               | false |
+| warm_starting      | warm starting with previous primal and dual solution | true  |
+
+### Solving a QP
 Solving the QP will return a solution object which, alongside the primal solution, contains values of the according dual variables, the objective value, and information about success of the solver. 
 ```cpp
 // solve QP 
